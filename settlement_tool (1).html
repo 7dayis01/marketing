@@ -1,0 +1,2579 @@
+<style>
+  .st-root {
+    --ink: #1e2a2f;
+    --paper: #eef0e9;
+    --paper-line: #d8dbcf;
+    --stamp: #a8412c;
+    --ok: #3c6e58;
+    --warn: #a6752c;
+    --panel: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Malgun Gothic", sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    padding: 28px 20px 60px;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
+  .st-root * { box-sizing: border-box; }
+  .st-mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .st-shell { max-width: 1040px; margin: 0 auto; }
+
+  .st-masthead {
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 28px;
+  }
+  .st-masthead h1 {
+    font-family: Georgia, "Noto Serif KR", serif;
+    font-size: 26px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
+  }
+  .st-masthead .st-sub { font-size: 12px; color: #5c6b64; letter-spacing: 0.04em; }
+
+  .st-steps { display: grid; gap: 10px; margin-bottom: 22px; }
+  .st-step {
+    display: grid; grid-template-columns: 34px 1fr auto; align-items: center;
+    gap: 14px; background: var(--panel); border: 1px solid var(--paper-line);
+    border-radius: 3px; padding: 12px 14px; position: relative;
+  }
+  .st-step.st-done { border-left: 3px solid var(--ok); }
+  .st-step.st-error { border-left: 3px solid var(--stamp); }
+  .st-step-no {
+    font-family: Georgia, serif; font-size: 20px; color: #b7bcae; font-weight: 700;
+  }
+  .st-step.st-done .st-step-no { color: var(--ok); }
+  .st-step-body .st-step-title { font-size: 14px; font-weight: 600; }
+  .st-step-body .st-step-desc { font-size: 12px; color: #6b7a72; margin-top: 2px; }
+  .st-step-body .st-step-file { font-size: 12px; color: var(--ok); margin-top: 3px; }
+  .st-step-body .st-step-err { font-size: 12px; color: var(--stamp); margin-top: 3px; }
+
+  .st-filebtn {
+    font-size: 12px; padding: 7px 14px; border: 1px solid var(--ink);
+    background: var(--panel); border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+  .st-filebtn:hover { background: var(--ink); color: var(--panel); }
+  .st-filebtn input { display: none; }
+
+  .st-sheetselect {
+    margin-top: 8px; font-size: 12px; padding: 5px 8px; border: 1px solid var(--paper-line);
+    border-radius: 3px; background: var(--panel);
+  }
+
+  .st-run {
+    width: 100%; padding: 14px; font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
+    background: var(--ink); color: var(--paper); border: none; border-radius: 3px;
+    cursor: pointer; margin-bottom: 26px; transition: transform 0.15s ease;
+  }
+  .st-run:disabled { background: #b7bcae; cursor: not-allowed; }
+  .st-run:not(:disabled):active { transform: scale(0.995); }
+
+  .st-results { display: none; }
+  .st-results.st-show { display: block; }
+
+  .st-stamp-wrap { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .st-stamp {
+    width: 58px; height: 58px; border-radius: 50%; border: 3px solid var(--stamp);
+    color: var(--stamp); display: flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif; font-weight: 700; font-size: 12px; text-align: center;
+    line-height: 1.15; transform: rotate(-8deg) scale(0.4); opacity: 0;
+    transition: transform 0.45s cubic-bezier(.2,1.4,.4,1), opacity 0.3s ease;
+    flex-shrink: 0;
+  }
+  .st-stamp.st-in { transform: rotate(-8deg) scale(1); opacity: 1; }
+  .st-stamp-caption { font-size: 12px; color: #5c6b64; }
+  .st-stamp-caption b { color: var(--ink); font-size: 14px; display: block; }
+
+  .st-card {
+    background: var(--panel); border: 1px solid var(--paper-line); border-radius: 3px;
+    margin-bottom: 18px; overflow: hidden;
+  }
+  .st-card-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 12px 16px; border-bottom: 1px solid var(--paper-line); background: #f7f8f3;
+  }
+  .st-card-head h2 { font-size: 13px; margin: 0; letter-spacing: 0.02em; }
+  .st-card-head .st-card-note { font-size: 11px; color: #8a948c; }
+
+  table.st-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.st-table td, table.st-table th {
+    padding: 8px 16px; border-bottom: 1px solid #eef0ea; text-align: left;
+  }
+  table.st-table th { font-size: 11px; color: #7d897f; font-weight: 600; }
+  table.st-table td.st-num { text-align: right; }
+  table.st-table tr:last-child td { border-bottom: none; }
+  table.st-table tr.st-flag td { background: #fbf3e4; }
+  table.st-table tr.st-flag td:first-child::before { content: "⚠ "; color: var(--warn); }
+
+  .st-sheet-wrap {
+    overflow: auto; max-height: 640px; border: 1px solid var(--paper-line);
+    border-radius: 3px; background: var(--panel);
+  }
+  table.st-sheet { border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+  table.st-sheet th.st-colhead, table.st-sheet th.st-rowhead {
+    position: sticky; background: #eceee6; color: #8a948c; font-weight: 500;
+    font-size: 10px; z-index: 2; border: 1px solid var(--paper-line);
+    min-width: 26px; padding: 2px 4px;
+  }
+  table.st-sheet th.st-colhead { top: 0; }
+  table.st-sheet th.st-rowhead { left: 0; text-align: right; }
+  table.st-sheet th.st-corner { top: 0; left: 0; z-index: 3; }
+  table.st-sheet td {
+    border: 1px solid #ecefe7; padding: 4px 8px; white-space: nowrap;
+    max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+  }
+  table.st-sheet td.st-num { text-align: right; font-family: "SFMono-Regular", Consolas, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  table.st-sheet td.st-filled { background: #eaf3ee; font-weight: 600; color: #204d38; }
+  table.st-sheet td.st-formula { color: #4a5568; font-style: italic; }
+  table.st-sheet td.st-empty { background: transparent; }
+  .st-sheet-legend { display: flex; align-items: center; gap: 16px; font-size: 11px; color: #6b7a72; margin: 8px 2px 4px; }
+  .st-sheet-legend .st-legend-item { display: flex; align-items: center; gap: 6px; }
+  .st-sheet-legend .st-swatch { width: 12px; height: 12px; background: #eaf3ee; border: 1px solid #cfe3d7; display: inline-block; border-radius: 2px; }
+  .st-sheet-legend .st-swatch-formula { width: 12px; height: 12px; border: 1px dashed #9aa5b1; display: inline-block; border-radius: 2px; }
+
+  .st-download {
+    display: inline-block; font-size: 12px; color: #5c6b64; text-decoration: underline;
+    margin-top: 10px;
+  }
+
+  .st-globalerr {
+    background: #fbeae6; border: 1px solid var(--stamp); color: #7a2c1c;
+    padding: 12px 14px; border-radius: 3px; font-size: 13px; margin-bottom: 20px; display: none;
+  }
+  .st-globalerr.st-show { display: block; }
+
+  .st-tabs { display: flex; gap: 4px; margin-bottom: 22px; border-bottom: 1px solid var(--paper-line); }
+  .st-tab {
+    padding: 10px 18px; font-size: 13px; font-weight: 600; color: #8a948c; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; border-top: none;
+    border-left: none; border-right: none;
+  }
+  .st-tab.st-tab-active { color: var(--ink); border-bottom-color: var(--ink); }
+  .st-tab-badge {
+    display: inline-block; margin-left: 6px; font-size: 10px; padding: 1px 6px; border-radius: 8px;
+    background: var(--ok); color: #fff; font-weight: 700;
+  }
+  .st-tabpanel { display: none; }
+  .st-tabpanel.st-tabpanel-active { display: block; }
+
+  .dash-empty {
+    text-align: center; padding: 70px 20px; color: #8a948c; font-size: 13px;
+    background: var(--panel); border: 1px dashed var(--paper-line); border-radius: 3px;
+  }
+  .dash-empty .dash-empty-cta {
+    display: inline-block; margin-top: 14px; padding: 9px 18px; background: var(--ink); color: var(--paper);
+    border-radius: 3px; font-size: 12px; font-weight: 700; cursor: pointer; border: none;
+  }
+
+  .dash-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
+  .dash-kpi {
+    background: var(--panel); border: 1px solid var(--paper-line); border-radius: 3px; padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .dash-kpi-label { font-size: 11px; color: #8a948c; letter-spacing: 0.02em; }
+  .dash-kpi-value {
+    font-size: 18px; font-weight: 700; font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dash-section { margin-bottom: 24px; }
+  .dash-section-title {
+    font-size: 13px; font-weight: 700; margin: 0 0 8px 2px; display: flex; align-items: baseline; gap: 8px;
+  }
+  .dash-section-title .dash-section-note { font-size: 11px; color: #8a948c; font-weight: 400; }
+  .dash-section-total {
+    margin-left: auto; font-size: 13px; font-weight: 700; font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+    background: #f7f2f4; border: 1px solid #ecdbe0; border-radius: 3px; padding: 3px 10px;
+  }
+  .dash-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .dash-pair { grid-template-columns: 1fr; } }
+
+  .dash-table-wrap {
+    background: var(--panel); border: 1px solid var(--paper-line); border-radius: 3px;
+    overflow-x: auto; overflow-y: visible;
+  }
+  table.dash-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.dash-table th, table.dash-table td {
+    padding: 5px 7px; border-bottom: 1px solid #eef0ea; white-space: nowrap; text-align: right;
+  }
+  table.dash-table th {
+    background: #f7f8f3; color: #5c6b64; font-weight: 600; font-size: 11px;
+  }
+  table.dash-table td.dash-rowlabel, table.dash-table th:first-child {
+    text-align: left; font-weight: 600;
+  }
+  table.dash-table tbody tr:hover td { background: #fafbf8; }
+  table.dash-table tr.dash-total-row td { background: #f7f2f4; font-weight: 700; }
+  table.dash-table td.dash-filled { background: #eaf3ee; color: #204d38; font-weight: 700; }
+  table.dash-table td.dash-formula { color: #6b7684; font-style: italic; }
+  table.dash-table td.dash-blank { color: #c3c9c1; }
+  table.dash-table td.dash-edited { background: #eaf0fb; color: #1f3d6b; font-weight: 700; }
+  table.dash-table td.dash-prevmonth { background: #f5f0e6; color: #6b5a2e; }
+  table.dash-table td.dash-total-col, table.dash-table th.dash-total-col-head {
+    border-left: 2px solid var(--ink); font-weight: 700;
+  }
+  table.dash-table td[data-editable="1"] { cursor: pointer; }
+  table.dash-table td[data-editable="1"]:hover { outline: 1px dashed #9aa5b1; outline-offset: -1px; }
+  table.dash-table td input.dash-edit-input {
+    width: 100%; box-sizing: border-box; text-align: right; font: inherit; border: 1px solid var(--ok);
+    border-radius: 2px; padding: 2px 4px; background: #fff;
+  }
+  .dash-edit-hint { font-size: 11px; color: #9aa5b1; margin: -6px 2px 14px; }
+  .dash-legend .dash-swatch-edited { width: 12px; height: 12px; background: #eaf0fb; border: 1px solid #c7d3ec; display: inline-block; border-radius: 2px; }
+  .dash-legend .dash-swatch-prevmonth { width: 12px; height: 12px; background: #f5f0e6; border: 1px solid #e3d7ba; display: inline-block; border-radius: 2px; }
+
+  .dash-legend { display: flex; align-items: center; gap: 16px; font-size: 11px; color: #6b7a72; margin: -4px 2px 14px; }
+  .dash-legend .dash-legend-item { display: flex; align-items: center; gap: 6px; }
+  .dash-legend .dash-swatch { width: 12px; height: 12px; background: #eaf3ee; border: 1px solid #cfe3d7; display: inline-block; border-radius: 2px; }
+  .dash-legend .dash-swatch-formula { width: 12px; height: 12px; border: 1px dashed #9aa5b1; display: inline-block; border-radius: 2px; }
+
+  .st-footnote { font-size: 11px; color: #93998f; margin-top: 30px; text-align: center; }
+
+  .dash-history-bar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 10px 14px;
+    background: var(--panel); border: 1px solid var(--paper-line); border-radius: 3px; font-size: 12px;
+  }
+  .dash-history-label { color: #8a948c; font-weight: 600; white-space: nowrap; }
+  .dash-history-bar select { flex: 1; padding: 5px 8px; border: 1px solid var(--paper-line); border-radius: 3px; font-size: 12px; }
+  .dash-history-btn {
+    padding: 6px 12px; font-size: 12px; font-weight: 600; border: 1px solid var(--ink); background: var(--panel);
+    border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+  .dash-history-btn:hover { background: var(--ink); color: var(--panel); }
+  .dash-history-btn-danger { border-color: var(--stamp); color: var(--stamp); }
+  .dash-history-btn-danger:hover { background: var(--stamp); color: #fff; }
+  .dash-history-btn-primary { border-color: var(--ok); background: var(--ok); color: #fff; }
+  .dash-history-btn-primary:hover { opacity: 0.9; background: var(--ok); color: #fff; }
+
+  .dash-save-row { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; }
+  .dash-save-input {
+    flex: 1; max-width: 220px; padding: 8px 10px; border: 1px solid var(--paper-line); border-radius: 3px; font-size: 12px;
+  }
+  .dash-save-msg { font-size: 12px; color: var(--ok); font-weight: 600; }
+  .dash-readonly-note {
+    font-size: 11px; color: var(--warn); background: #fbf3e4; border: 1px solid #eadcb8; border-radius: 3px;
+    padding: 8px 12px; margin-bottom: 16px;
+  }
+
+  .dash-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(30, 42, 47, 0.45);
+    align-items: center; justify-content: center; z-index: 1000;
+  }
+  .dash-modal-overlay.st-show { display: flex; }
+  .dash-modal {
+    background: #fff; border-radius: 4px; padding: 22px 24px; max-width: 340px; width: 90%;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  }
+  .dash-modal-msg { font-size: 13px; color: var(--ink); white-space: pre-line; line-height: 1.5; margin-bottom: 18px; }
+  .dash-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+  .dash-manual-section {
+    background: var(--panel); border: 1px solid var(--paper-line); border-radius: 3px;
+    padding: 16px 18px; margin-bottom: 20px;
+  }
+  .dash-manual-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .dash-manual-title .dash-manual-note { font-size: 11px; color: #8a948c; font-weight: 400; }
+  .dash-manual-note { font-size: 11px; color: #8a948c; }
+  .dash-manual-help { font-size: 11px; color: #6b7a72; margin-bottom: 10px; line-height: 1.5; }
+  .dash-manual-table-wrap { overflow-x: auto; margin-bottom: 10px; }
+  table.dash-manual-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.dash-manual-table th {
+    text-align: left; font-size: 11px; color: #8a948c; font-weight: 600; padding: 4px 6px;
+  }
+  table.dash-manual-table td { padding: 3px 4px; }
+  table.dash-manual-table input {
+    width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 12px; border: 1px solid var(--paper-line);
+    border-radius: 3px; font-family: inherit;
+  }
+  table.dash-manual-table input[data-field="name"] { min-width: 140px; }
+  table.dash-manual-table input[data-field="rate"] { width: 70px; text-align: right; }
+  table.dash-manual-table input:not([data-field="name"]):not([data-field="rate"]) { text-align: right; min-width: 100px; }
+  .dash-manual-row-del {
+    border: none; background: none; color: var(--stamp); cursor: pointer; font-size: 15px; padding: 2px 6px;
+  }
+  .dash-manual-row-del:hover { color: #7a2c1c; }
+  .dash-manual-fixed-cell { text-align: center; }
+  table.dash-manual-table input[type="checkbox"] { width: auto; padding: 0; cursor: pointer; }
+  table.dash-manual-table td.dash-manual-hint { background: #fff6dd; }
+  table.dash-manual-table td.dash-manual-hint input { border-color: #e3c565; background: #fffdf5; }
+  .dash-manual-legend-hint { background: #fff6dd; border: 1px solid #e3c565; border-radius: 2px; padding: 0 4px; }
+
+  .login-overlay {
+    position: fixed; inset: 0; background: #1e2a2f; z-index: 5000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-box {
+    background: #fff; border-radius: 6px; padding: 36px 32px; width: 90%; max-width: 320px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center;
+  }
+  .login-box h2 { font-size: 18px; margin: 0 0 6px; color: #1e2a2f; }
+  .login-box p { font-size: 12px; color: #8a948c; margin: 0 0 20px; }
+  .login-box input[type="password"] {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 14px;
+    border: 1px solid #d8dbcf; border-radius: 3px; margin-bottom: 10px; text-align: center;
+  }
+  .login-box button {
+    width: 100%; padding: 11px; font-size: 14px; font-weight: 700; background: #1e2a2f; color: #fff;
+    border: none; border-radius: 3px; cursor: pointer;
+  }
+  .login-box button:hover { opacity: 0.9; }
+  .login-remember { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0; font-size: 12px; color: #6b7a72; }
+  .login-error { color: #a8412c; font-size: 12px; margin-top: 8px; min-height: 16px; }
+</style>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>매출 정산 자동화</h2>
+    <p>관리자 비밀번호를 입력하세요</p>
+    <input type="password" id="loginPasswordInput" placeholder="비밀번호" autocomplete="off">
+    <label class="login-remember"><input type="checkbox" id="loginRememberCheckbox" checked> 이 브라우저에서 기억하기</label>
+    <button id="loginSubmitBtn">확인</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // 비밀번호를 코드에 그대로 적지 않고 해시(SHA-256)로만 저장해서 비교합니다.
+  // 비밀번호를 바꾸려면: 브라우저 콘솔에서 아래처럼 새 해시를 만들어서 PASSWORD_HASH 값만 바꾸면 됩니다.
+  //   crypto.subtle.digest("SHA-256", new TextEncoder().encode("새비밀번호"))
+  //     .then(b => console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")))
+  // 기본 비밀번호: 00!@
+  var PASSWORD_HASH = "07a411a3c3f9b2084109d981130464ec87175db3284439439c896c02f0be2783";
+  var REMEMBER_KEY = "settlement_tool_authed";
+
+  async function sha256(text) {
+    var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+  }
+
+  function unlock() {
+    document.getElementById("loginOverlay").style.display = "none";
+    document.getElementById("stRoot").style.display = "";
+  }
+
+  if (localStorage.getItem(REMEMBER_KEY) === "1") {
+    unlock();
+  } else {
+    var input = document.getElementById("loginPasswordInput");
+    var btn = document.getElementById("loginSubmitBtn");
+    var err = document.getElementById("loginError");
+    var remember = document.getElementById("loginRememberCheckbox");
+
+    async function trySubmit() {
+      var hash = await sha256(input.value);
+      if (hash === PASSWORD_HASH) {
+        if (remember.checked) localStorage.setItem(REMEMBER_KEY, "1");
+        unlock();
+      } else {
+        err.textContent = "비밀번호가 올바르지 않습니다.";
+        input.value = "";
+        input.focus();
+      }
+    }
+    btn.addEventListener("click", trySubmit);
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") trySubmit(); });
+    input.focus();
+  }
+})();
+</script>
+
+<div class="st-root" id="stRoot" style="display:none;">
+  <div class="st-shell">
+    <div class="st-masthead">
+      <h1>매출 정산 자동화</h1>
+      <div class="st-sub">UPLOAD → CALCULATE → REVIEW</div>
+    </div>
+
+    <div class="st-globalerr" id="globalErr"></div>
+
+    <div class="dash-modal-overlay" id="confirmOverlay">
+      <div class="dash-modal">
+        <div class="dash-modal-msg" id="confirmMsg"></div>
+        <div class="dash-modal-actions">
+          <button class="dash-history-btn" id="confirmCancelBtn">취소</button>
+          <button class="dash-history-btn dash-history-btn-primary" id="confirmOkBtn">확인</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="st-tabs">
+      <button class="st-tab st-tab-active" id="tabBtn-dashboard" data-tab="dashboard">대시보드</button>
+      <button class="st-tab" id="tabBtn-upload" data-tab="upload">업로드</button>
+    </div>
+
+    <div class="st-tabpanel st-tabpanel-active" id="tabpanel-dashboard">
+      <div class="dash-history-bar" id="dashHistoryBar">
+        <span class="dash-history-label">저장된 월</span>
+        <select class="st-sheetselect" id="historySelect"><option value="">불러올 월 선택...</option></select>
+        <button class="dash-history-btn" id="historyLoadBtn">불러오기</button>
+        <button class="dash-history-btn dash-history-btn-danger" id="historyDeleteBtn">삭제</button>
+      </div>
+
+      <div class="dash-empty" id="dashEmpty">
+        아직 정리된 매출 데이터가 없습니다.<br>
+        업로드 탭에서 파일 4개를 올리고 정리를 실행하거나, 위에서 저장된 월을 불러오세요.
+        <br><button class="dash-empty-cta" id="goUploadBtn">업로드 탭으로 이동</button>
+      </div>
+
+      <div class="st-results" id="results">
+        <div class="st-stamp-wrap">
+          <div class="st-stamp" id="stamp">정리<br>완료</div>
+          <div class="st-stamp-caption"><b id="stampMonth">-</b><span id="stampSub">매출 정산 내용을 확인하세요</span></div>
+        </div>
+
+        <div id="dashboardContent"></div>
+
+        <div class="dash-save-row">
+          <input type="text" class="dash-save-input" id="saveMonthInput" placeholder="저장할 이름 (예: 2026-07)">
+          <button class="dash-history-btn dash-history-btn-primary" id="saveMonthBtn">이번 달 대시보드 저장</button>
+          <span class="dash-save-msg" id="saveMonthMsg"></span>
+        </div>
+
+        <a class="st-download" id="downloadLink" href="#">필요하면 엑셀 파일로도 저장</a>
+      </div>
+    </div>
+
+    <div class="st-tabpanel" id="tabpanel-upload">
+      <div class="st-steps">
+        <div class="st-step" id="step-원본">
+          <div class="st-step-no">01</div>
+          <div class="st-step-body">
+            <div class="st-step-title">매출 원본</div>
+            <div class="st-step-desc">이레이즈_XX월.xlsx — 광고 플랫폼 정산 원본</div>
+            <div class="st-step-file"></div>
+            <div class="st-step-err"></div>
+          </div>
+          <label class="st-filebtn">파일 선택<input type="file" accept=".xlsx" data-key="원본"></label>
+        </div>
+
+        <div class="st-step" id="step-추가시트">
+          <div class="st-step-no">02</div>
+          <div class="st-step-body">
+            <div class="st-step-title">추가시트</div>
+            <div class="st-step-desc">담당자 매핑(표1·표2) — 원본에 없으면 이 파일에서 가져옴</div>
+            <div class="st-step-file"></div>
+            <div class="st-step-err"></div>
+          </div>
+          <label class="st-filebtn">파일 선택<input type="file" accept=".xlsx" data-key="추가시트"></label>
+        </div>
+
+        <div class="st-step" id="step-검색팀매출">
+          <div class="st-step-no">03</div>
+          <div class="st-step-body">
+            <div class="st-step-title">검색팀 매출군</div>
+            <div class="st-step-desc">매출2 · 페이백상세 산출 근거</div>
+            <div class="st-step-file"></div>
+            <div class="st-step-err"></div>
+            <select class="st-sheetselect" id="sheetSelect" style="display:none;"></select>
+          </div>
+          <label class="st-filebtn">파일 선택<input type="file" accept=".xlsx" data-key="검색팀매출"></label>
+        </div>
+
+        <div class="st-step" id="step-기입템플릿">
+          <div class="st-step-no">04</div>
+          <div class="st-step-body">
+            <div class="st-step-title">매출기입 템플릿</div>
+            <div class="st-step-desc">채워야 할 빈 양식</div>
+            <div class="st-step-file"></div>
+            <div class="st-step-err"></div>
+            <select class="st-sheetselect" id="fillSheetSelect" style="display:none;"></select>
+            <label class="dash-storage-radio" style="margin-top:6px;">
+              <input type="checkbox" id="fixTemplateCheckbox"> 이 템플릿 고정해두기 (매달 다시 안 올려도 됨)
+            </label>
+            <div id="fixedTemplateStatus" class="dash-manual-note" style="display:none; margin-top:4px;"></div>
+          </div>
+          <label class="st-filebtn">파일 선택<input type="file" accept=".xlsx" data-key="기입템플릿"></label>
+        </div>
+      </div>
+
+      <div class="dash-manual-section">
+        <div class="dash-manual-title">요율 상이 상세 <span class="dash-manual-note">(선택 입력) — 매출기입 파일 자체에 없는 예외 거래처는 여기서 직접 관리하세요</span></div>
+        <div class="dash-manual-help">매출기입 템플릿을 올리면 기존에 입력되어 있던 거래처가 자동으로 채워집니다. <b>엑셀에서 표를 복사해서 셀에 그대로 붙여넣기</b>도 가능하고, Enter/화살표 위·아래로 셀 이동도 됩니다. <b>"고정"</b>에 체크하면 광고주명·요율을 기억해서 다음 달에도 자동으로 채워줍니다 (금액은 매달 새로 입력). <span class="dash-manual-legend-hint">노란색 칸</span>은 전월에 값이 있었던 채널이라 이번 달 값을 입력해야 하는 곳입니다.</div>
+        <div class="dash-manual-table-wrap">
+          <table class="dash-manual-table" id="rateExceptionTable">
+            <thead>
+              <tr><th>광고주명</th><th>요율(%)</th><th>파워컨텐츠</th><th>구글</th><th>메타</th><th>고정</th><th></th></tr>
+            </thead>
+            <tbody id="rateExceptionTbody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="dash-history-btn" id="rateExceptionAddBtn">+ 행 추가</button>
+      </div>
+
+      <button class="st-run" id="runBtn" disabled>정리 실행</button>
+    </div>
+
+    <div class="st-footnote">계산 결과는 검증용입니다 · 원본 데이터와 다시 한번 대조해 주세요</div>
+  </div>
+</div>
+
+<script>
+// Claude 아티팩트 밖(일반 웹 호스팅)에서 열었을 때를 위한 폴백:
+// window.storage가 없으면 브라우저의 localStorage로 동일한 인터페이스를 흉내낸다.
+// (get/set/delete/list의 시그니처를 그대로 맞춰서, 아래 앱 코드는 전혀 수정할 필요 없음)
+if (!window.storage) {
+  (function () {
+    const PREFIX = "settlement_tool_storage__";
+    window.storage = {
+      async get(key, shared) {
+        try {
+          const raw = localStorage.getItem(PREFIX + key);
+          if (raw === null) return null;
+          return { key, value: raw, shared: !!shared };
+        } catch (e) { return null; }
+      },
+      async set(key, value, shared) {
+        try {
+          localStorage.setItem(PREFIX + key, value);
+          return { key, value, shared: !!shared };
+        } catch (e) { return null; }
+      },
+      async delete(key, shared) {
+        try {
+          localStorage.removeItem(PREFIX + key);
+          return { key, deleted: true, shared: !!shared };
+        } catch (e) { return null; }
+      },
+      async list(prefix, shared) {
+        try {
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.indexOf(PREFIX) === 0) {
+              const realKey = k.slice(PREFIX.length);
+              if (!prefix || realKey.indexOf(prefix) === 0) keys.push(realKey);
+            }
+          }
+          return { keys, prefix, shared: !!shared };
+        } catch (e) { return { keys: [] }; }
+      },
+    };
+  })();
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// =====================================================================
+// 경량 수식 평가기 - 매출기입 템플릿의 수식(SUM/ROUND/IFERROR/사칙연산)을
+// 실제로 계산해서 미리보기에 값을 보여주기 위함. 원본 파일의 수식(cell.f)은
+// 절대 지우지 않고 그대로 둔 채, 화면 표시용으로만 별도 계산한다.
+// =====================================================================
+(function () {
+  "use strict";
+
+  function tokenize(src) {
+    const tokens = [];
+    let i = 0;
+    while (i < src.length) {
+      const ch = src[i];
+      if (/\s/.test(ch)) { i++; continue; }
+      if (ch === '"') {
+        let j = i + 1, s = "";
+        while (j < src.length && src[j] !== '"') { s += src[j]; j++; }
+        tokens.push({ type: "string", value: s });
+        i = j + 1;
+        continue;
+      }
+      if (/[0-9.]/.test(ch)) {
+        let j = i, s = "";
+        while (j < src.length && /[0-9.]/.test(src[j])) { s += src[j]; j++; }
+        tokens.push({ type: "number", value: parseFloat(s) });
+        i = j;
+        continue;
+      }
+      if (/[A-Za-z_$]/.test(ch)) {
+        let j = i, s = "";
+        while (j < src.length && /[A-Za-z0-9_$.]/.test(src[j])) { s += src[j]; j++; }
+        tokens.push({ type: "ident", value: s });
+        i = j;
+        continue;
+      }
+      if ("+-*/(),:".includes(ch)) { tokens.push({ type: ch }); i++; continue; }
+      i++;
+    }
+    return tokens;
+  }
+
+  function isCellRef(ident) { return /^\$?[A-Za-z]{1,3}\$?[0-9]+$/.test(ident); }
+  function normalizeCellRef(ident) { return ident.replace(/\$/g, ""); }
+
+  class UnsupportedFormula extends Error {}
+
+  function Parser(tokens, ctx) {
+    let pos = 0;
+    function peek() { return tokens[pos]; }
+    function next() { return tokens[pos++]; }
+    function expect(type) {
+      const t = next();
+      if (!t || t.type !== type) throw new UnsupportedFormula("expected " + type);
+      return t;
+    }
+    function parseExpr() {
+      let val = parseTerm();
+      while (peek() && (peek().type === "+" || peek().type === "-")) {
+        const op = next().type;
+        const rhs = parseTerm();
+        val = combine(val, rhs, op === "+" ? (a, b) => a + b : (a, b) => a - b);
+      }
+      return val;
+    }
+    function parseTerm() {
+      let val = parseUnary();
+      while (peek() && (peek().type === "*" || peek().type === "/")) {
+        const op = next().type;
+        const rhs = parseUnary();
+        val = combine(val, rhs, op === "*" ? (a, b) => a * b : (a, b) => a / b);
+      }
+      return val;
+    }
+    function parseUnary() {
+      if (peek() && peek().type === "-") {
+        next();
+        const v = parseUnary();
+        return typeof v === "number" ? -v : 0;
+      }
+      return parseFactor();
+    }
+    function combine(a, b, fn) {
+      const av = typeof a === "number" && isFinite(a) ? a : 0;
+      const bv = typeof b === "number" && isFinite(b) ? b : 0;
+      return fn(av, bv);
+    }
+    function parseFactor() {
+      const t = peek();
+      if (!t) throw new UnsupportedFormula("unexpected end");
+      if (t.type === "(") { next(); const v = parseExpr(); expect(")"); return v; }
+      if (t.type === "number") { next(); return t.value; }
+      if (t.type === "string") { next(); return null; }
+      if (t.type === "ident") {
+        next();
+        if (peek() && peek().type === "(") return parseFuncCall(t.value);
+        if (isCellRef(t.value)) return ctx.getValue(normalizeCellRef(t.value));
+        throw new UnsupportedFormula("unknown ident " + t.value);
+      }
+      throw new UnsupportedFormula("unexpected token " + t.type);
+    }
+    function parseRangeOrExpr() {
+      const start = pos;
+      if (peek() && peek().type === "ident" && isCellRef(peek().value)) {
+        const first = peek().value;
+        const save = pos;
+        next();
+        if (peek() && peek().type === ":") {
+          next();
+          const t2 = peek();
+          if (t2 && t2.type === "ident" && isCellRef(t2.value)) {
+            next();
+            return { range: [normalizeCellRef(first), normalizeCellRef(t2.value)] };
+          }
+        }
+        pos = save;
+      }
+      pos = start;
+      return { value: parseExpr() };
+    }
+    function parseFuncCall(name) {
+      expect("(");
+      const args = [];
+      if (peek() && peek().type !== ")") {
+        args.push(parseRangeOrExpr());
+        while (peek() && peek().type === ",") { next(); args.push(parseRangeOrExpr()); }
+      }
+      expect(")");
+      const fname = name.toUpperCase();
+      if (fname === "SUM") {
+        let total = 0;
+        for (const a of args) {
+          if (a.range) total += ctx.sumRange(a.range[0], a.range[1]);
+          else if (typeof a.value === "number") total += a.value;
+        }
+        return total;
+      }
+      if (fname === "ROUND") {
+        const raw = args[0] ? args[0].value : null;
+        const v = typeof raw === "number" && isFinite(raw) ? raw : 0;
+        const digits = args[1] ? (args[1].value || 0) : 0;
+        const m = Math.pow(10, digits);
+        return Math.round(v * m) / m;
+      }
+      if (fname === "IFERROR") {
+        const primary = args[0] ? args[0].value : null;
+        const isBad = primary === null || typeof primary !== "number" || !isFinite(primary);
+        if (isBad) return args[1] ? args[1].value : null;
+        return primary;
+      }
+      if (fname === "AVERAGE") {
+        let total = 0, count = 0;
+        for (const a of args) {
+          if (a.range) { total += ctx.sumRange(a.range[0], a.range[1]); count += ctx.countRange(a.range[0], a.range[1]); }
+          else if (typeof a.value === "number") { total += a.value; count++; }
+        }
+        return count ? total / count : null;
+      }
+      throw new UnsupportedFormula("unsupported function " + fname);
+    }
+    return { parseExpr };
+  }
+
+  function evaluateFormula(formulaStr, ctx) {
+    if (formulaStr.indexOf("DUMMYFUNCTION") !== -1 || formulaStr.indexOf("__xludf") !== -1) return null;
+    const tokens = tokenize(formulaStr);
+    return Parser(tokens, ctx).parseExpr();
+  }
+
+  function createSheetEvaluator(ws) {
+    const memo = new Map();
+    const visiting = new Set();
+    function getValue(addr) {
+      if (memo.has(addr)) return memo.get(addr);
+      if (visiting.has(addr)) return null;
+      const cell = ws[addr];
+      if (!cell) { memo.set(addr, null); return null; }
+      if (cell.f) {
+        visiting.add(addr);
+        let val;
+        try { val = evaluateFormula(cell.f, ctx); }
+        catch (e) { val = typeof cell.v === "number" ? cell.v : null; }
+        visiting.delete(addr);
+        memo.set(addr, val);
+        return val;
+      }
+      const v = typeof cell.v === "number" ? cell.v : (cell.v === undefined ? null : cell.v);
+      memo.set(addr, v);
+      return v;
+    }
+    function sumRange(startAddr, endAddr) {
+      const s = XLSX.utils.decode_cell(startAddr), e = XLSX.utils.decode_cell(endAddr);
+      let total = 0;
+      for (let r = Math.min(s.r, e.r); r <= Math.max(s.r, e.r); r++)
+        for (let c = Math.min(s.c, e.c); c <= Math.max(s.c, e.c); c++) {
+          const v = getValue(XLSX.utils.encode_cell({ r, c }));
+          if (typeof v === "number") total += v;
+        }
+      return total;
+    }
+    function countRange(startAddr, endAddr) {
+      const s = XLSX.utils.decode_cell(startAddr), e = XLSX.utils.decode_cell(endAddr);
+      let count = 0;
+      for (let r = Math.min(s.r, e.r); r <= Math.max(s.r, e.r); r++)
+        for (let c = Math.min(s.c, e.c); c <= Math.max(s.c, e.c); c++)
+          if (typeof getValue(XLSX.utils.encode_cell({ r, c })) === "number") count++;
+      return count;
+    }
+    const ctx = { getValue, sumRange, countRange };
+    return { getValue };
+  }
+
+  window.FormulaEval = { createSheetEvaluator };
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+
+  // =====================================================================
+  // 계산 로직 (settlement-logic.js 내용을 그대로 포함)
+  // =====================================================================
+
+  function cellVal(sheet, row, col) {
+    const addr = XLSX.utils.encode_cell({ r: row - 1, c: col - 1 });
+    const cell = sheet[addr];
+    if (!cell || cell.v === undefined) return null;
+    return cell.v;
+  }
+  function sheetDims(sheet) {
+    const ref = sheet["!ref"];
+    if (!ref) return { rows: 0, cols: 0 };
+    const range = XLSX.utils.decode_range(ref);
+    return { rows: range.e.r + 1, cols: range.e.c + 1 };
+  }
+  function findHeaderCol(sheet, headerRow, name, maxCol) {
+    maxCol = maxCol || 60;
+    for (let c = 1; c <= maxCol; c++) {
+      const v = cellVal(sheet, headerRow, c);
+      if (v !== null && String(v).trim() === name) return c;
+    }
+    return null;
+  }
+  function findRowByCellValue(sheet, value, maxRow, maxCol) {
+    const dims = sheetDims(sheet);
+    maxRow = maxRow || dims.rows;
+    maxCol = maxCol || dims.cols;
+    for (let r = 1; r <= maxRow; r++) {
+      for (let c = 1; c <= maxCol; c++) {
+        if (cellVal(sheet, r, c) === value) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+  function lastRowWithData(sheet, col, startRow) {
+    let r = startRow, last = startRow - 1;
+    while (cellVal(sheet, r, col) !== null) { last = r; r += 1; }
+    return last;
+  }
+  function round0(v) {
+    if (v === null || v === undefined) return null;
+    return Math.round(v);
+  }
+  function findSheetByLabel(wb, label) {
+    for (const name of wb.SheetNames) {
+      if (findRowByCellValue(wb.Sheets[name], label, 10, 20)) return name;
+    }
+    return null;
+  }
+
+  const DEFAULT_CHANNEL_MANAGER_MAP = {
+    "그린즈컴퍼니": "대전 권태우", "이너웹": "대전 김동한", "네모넷": "대전 김동혁",
+    "화이트오렌지": "대전 김태리", "플러스넷": "대전 조은화",
+    "최정호13": "대전 최정호", "최정호8": "대전 최정호2",
+  };
+
+  function computeNaverChannelTotals(wb원본, wb추가시트) {
+    const wsNaver = wb원본.Sheets["네이버CPC"];
+    const addSheetName = findSheetByLabel(wb추가시트, "표1");
+    if (!addSheetName) throw new Error("추가시트에서 '표1'을 찾을 수 없습니다.");
+    const wsAdd = wb추가시트.Sheets[addSheetName];
+
+    let headerRow = null;
+    const dims = sheetDims(wsNaver);
+    for (let r = 1; r <= Math.min(10, dims.rows); r++) {
+      if (findHeaderCol(wsNaver, r, "광고주ID", 20)) { headerRow = r; break; }
+    }
+    if (!headerRow) throw new Error("네이버CPC 시트에서 헤더 행을 찾을 수 없습니다.");
+
+    const advCol = findHeaderCol(wsNaver, headerRow, "광고주ID");
+    const accCol = findHeaderCol(wsNaver, headerRow, "광고계정 AdAccontNo");
+    const totalCol = findHeaderCol(wsNaver, headerRow, "유상실적TOTAL");
+    if (!advCol || !accCol || !totalCol) {
+      throw new Error("네이버CPC 시트에서 필요한 컬럼을 찾을 수 없습니다.");
+    }
+    const lastRow = lastRowWithData(wsNaver, advCol, headerRow + 1);
+
+    const table1 = {};
+    { let r = 3; while (cellVal(wsAdd, r, 1) !== null) {
+        const k = cellVal(wsAdd, r, 1); if (!(k in table1)) table1[k] = cellVal(wsAdd, r, 2); r++; } }
+    const table2 = {};
+    { let r = 3; while (cellVal(wsAdd, r, 4) !== null) {
+        const k = cellVal(wsAdd, r, 4); if (!(k in table2)) table2[k] = cellVal(wsAdd, r, 6); r++; } }
+
+    const mgrTotals = {};
+    for (let r = headerRow + 1; r <= lastRow; r++) {
+      const adv = cellVal(wsNaver, r, advCol);
+      const acc = cellVal(wsNaver, r, accCol);
+      const total = cellVal(wsNaver, r, totalCol) || 0;
+      let mgr = table2[adv];
+      if (mgr === undefined || mgr === null) mgr = table1[acc];
+      if (mgr === undefined || mgr === null) continue;
+      mgrTotals[mgr] = (mgrTotals[mgr] || 0) + total;
+    }
+
+    let channelManagerMap;
+    const label3 = findRowByCellValue(wsAdd, "채널구분", 10, 20);
+    if (label3) {
+      channelManagerMap = {};
+      let r = label3.row + 1;
+      while (cellVal(wsAdd, r, label3.col) !== null) {
+        channelManagerMap[cellVal(wsAdd, r, label3.col)] = cellVal(wsAdd, r, label3.col + 1);
+        r++;
+      }
+    } else {
+      channelManagerMap = DEFAULT_CHANNEL_MANAGER_MAP;
+    }
+
+    const channelTotals = {};
+    for (const [channel, mgr] of Object.entries(channelManagerMap)) {
+      channelTotals[channel] = mgrTotals[mgr] || 0;
+    }
+    return { channelTotals, mgrTotals };
+  }
+
+  function computeKakaoMarketerTotals(wb원본, sheetName) {
+    const ws = wb원본.Sheets[sheetName];
+    if (!ws) throw new Error(`'${sheetName}' 시트를 찾을 수 없습니다.`);
+    const dims = sheetDims(ws);
+    let headerRow = null;
+    for (let r = 1; r <= Math.min(10, dims.rows); r++) {
+      if (findHeaderCol(ws, r, "마케터", 5) && findHeaderCol(ws, r, "마케터명", 30)) { headerRow = r; break; }
+    }
+    if (!headerRow) throw new Error(`${sheetName} 시트에서 헤더 행을 찾을 수 없습니다.`);
+    const marketerNameCol = findHeaderCol(ws, headerRow, "마케터명", 30);
+    const feeCol = findHeaderCol(ws, headerRow, "광고게재수수료", 30);
+    const marketerCol = findHeaderCol(ws, headerRow, "마케터", 5);
+    const lastRow = lastRowWithData(ws, marketerCol, headerRow + 1);
+    const totals = {};
+    for (let r = headerRow + 1; r <= lastRow; r++) {
+      const name = cellVal(ws, r, marketerNameCol);
+      const fee = cellVal(ws, r, feeCol) || 0;
+      if (name === null) continue;
+      totals[name] = (totals[name] || 0) + fee;
+    }
+    return totals;
+  }
+
+  function computeSettlementTotals(wb원본) {
+    const ws = wb원본.Sheets["정산내역"];
+    if (!ws) throw new Error("'정산내역' 시트를 찾을 수 없습니다.");
+    const dims = sheetDims(ws);
+    const found = findRowByCellValue(ws, "카카오 CPC", dims.rows, 10);
+    if (!found) throw new Error("정산내역 시트에서 '카카오 CPC' 항목을 찾을 수 없습니다.");
+    const labelCol = found.col;
+    const 매출Col = labelCol + 1; // 매출(VAT 미포함, raw)
+    const wantedLabels = new Set(["카카오 CPC", "카카오 모먼트", "네이버 CPC", "네이버_멘토뱅크",
+      "네이버 GFA", "타겟팅게이츠", "모비온", "모비데이즈(당근)", "모비데이즈"]);
+    const rows = {}; let seenGFA = 0;
+    for (let r = 1; r <= dims.rows; r++) {
+      const label = cellVal(ws, r, labelCol);
+      if (label === null || !wantedLabels.has(label)) continue;
+      let key = label;
+      if (label === "네이버 GFA") { key = seenGFA === 0 ? "네이버 GFA(0.14)" : "네이버 GFA(0.09)"; seenGFA++; }
+      const total = cellVal(ws, r, 매출Col);
+      rows[key] = total !== null ? Math.trunc(total) : 0;
+    }
+    return rows;
+  }
+
+  function computeSearchTeamSales(wb검색팀, sheetName) {
+    const ws = wb검색팀.Sheets[sheetName];
+    if (!ws) throw new Error(`검색팀 매출군에서 '${sheetName}' 시트를 찾을 수 없습니다.`);
+    const dims = sheetDims(ws);
+    const found = findRowByCellValue(ws, "VAT제외", dims.rows, 5);
+    if (!found) throw new Error(`${sheetName} 시트에서 [표] 매출 총계 행을 찾을 수 없습니다.`);
+    const totalRow = found.row;
+    const headerRow = totalRow - 2;
+    const normalize = (s) => String(s).replace(/\s+/g, " ").trim();
+    const headerToCol = {};
+    for (let c = 1; c <= dims.cols; c++) {
+      const v = cellVal(ws, headerRow, c);
+      if (v !== null) { const key = normalize(v); if (!(key in headerToCol)) headerToCol[key] = c; }
+    }
+    const wanted = ["파컨 / 플레이스 (수임료 계정만 기재)", "구글 애드워즈 (수임료 계정만 기재)",
+      "SNS", "ADN/롤링보드", "타불라", "기타 (GFA,당근)"];
+    const result = {};
+    for (const name of wanted) {
+      const col = headerToCol[normalize(name)];
+      result[name] = col ? round0(cellVal(ws, totalRow, col)) : null;
+    }
+    return result;
+  }
+
+  const PAYBACK_COMPANIES = ["삼성스마일안과(면세)", "21세기병원", "사주천궁", "술픽(술벙커)",
+    "당신의타로(글루잉)", "다모아", "에버엠치과", "다이따"];
+
+  function computePaybackDetail(wb검색팀, sheetName) {
+    const ws = wb검색팀.Sheets[sheetName];
+    const dims = sheetDims(ws);
+    const label = findRowByCellValue(ws, "[표] 페이백 정산 내역", dims.rows, dims.cols);
+    if (!label) throw new Error(`${sheetName} 시트에서 [표] 페이백 정산 내역을 찾을 수 없습니다.`);
+    const headerRow = label.row + 1;
+    const nameCol = findHeaderCol(ws, headerRow, "업체명", dims.cols);
+    if (!nameCol) throw new Error("페이백 정산 내역 표에서 '업체명' 열을 찾을 수 없습니다.");
+    const nameToRow = {};
+    for (let r = headerRow; r <= dims.rows; r++) {
+      const v = cellVal(ws, r, nameCol);
+      if (v && v !== "VAT제외") nameToRow[v] = r;
+    }
+    const result = {}; const missing = [];
+    for (const company of PAYBACK_COMPANIES) {
+      const r = nameToRow[company];
+      if (r === undefined) { missing.push(company); continue; }
+      result[company] = {
+        naver: cellVal(ws, r, nameCol + 1), kakao: cellVal(ws, r, nameCol + 2),
+        moment: cellVal(ws, r, nameCol + 3), total: cellVal(ws, r, nameCol + 4),
+        excl: round0(cellVal(ws, r, nameCol + 5)), pay: round0(cellVal(ws, r, nameCol + 6)),
+      };
+    }
+    return { result, missing };
+  }
+
+  // =====================================================================
+  // 매출기입 템플릿에 값 쓰기
+  // =====================================================================
+
+  function setCell(ws, row, col, val, filledSet) {
+    const addr = XLSX.utils.encode_cell({ r: row - 1, c: col - 1 });
+    const existing = ws[addr];
+    if (val === null || val === undefined) {
+      // 값만 비우고, 원래 서식(배경색 등)은 남겨서 빈 칸이 원래 모양 그대로 보이게 함
+      if (existing) { delete existing.v; delete existing.f; delete existing.w; existing.t = "z"; }
+      else delete ws[addr];
+      return;
+    }
+    // 기존 셀에 있던 서식(s: 배경색·폰트, z: 숫자표시형식)은 그대로 유지하고 값만 교체
+    const cell = existing ? Object.assign({}, existing) : {};
+    cell.t = typeof val === "string" ? "s" : "n";
+    cell.v = val;
+    delete cell.f; // 값을 직접 넣었으니 기존 수식은 제거
+    delete cell.w; // 캐시된 표시 텍스트는 지워서 새 값 기준으로 다시 표시되게 함
+    ws[addr] = cell;
+    if (filledSet) filledSet.add(addr);
+    const ref = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : null;
+    if (ref) {
+      ref.e.r = Math.max(ref.e.r, row - 1);
+      ref.e.c = Math.max(ref.e.c, col - 1);
+      ws["!ref"] = XLSX.utils.encode_range(ref);
+    }
+  }
+
+  function findAgencyRow(ws, name, rate) {
+    const dims = sheetDims(ws);
+    for (let r = 1; r <= dims.rows; r++) {
+      if (cellVal(ws, r, 2) === name) {
+        const rr = cellVal(ws, r, 3);
+        if (rate === undefined || Math.abs(rr - rate) < 1e-6) return r;
+      }
+    }
+    return null;
+  }
+
+  function findPaybackRowByName(ws, name) {
+    const dims = sheetDims(ws);
+    for (let r = 1; r <= dims.rows; r++) {
+      if (cellVal(ws, r, 2) === name) return r;
+    }
+    return null;
+  }
+
+  function findRowByLabelInCol(ws, label, col) {
+    const dims = sheetDims(ws);
+    for (let r = 1; r <= dims.rows; r++) {
+      if (cellVal(ws, r, col) === label) return r;
+    }
+    return null;
+  }
+
+  function fillTemplate(wb기입, sheetName, result) {
+    const ws = wb기입.Sheets[sheetName];
+    const filledSet = new Set();
+
+    // 매출1/매출2 : '합산 매출' 행을 라벨로 찾아서 채움 (양식이 바뀌어도 안전하게 대응)
+    const salesRow = findRowByLabelInCol(ws, "합산 매출", 2);
+    if (!salesRow) throw new Error("'합산 매출' 행을 찾을 수 없습니다 (매출1 표).");
+
+    const s = result.settle;
+    setCell(ws, salesRow, 3, s["네이버_멘토뱅크"] || 0, filledSet);
+    setCell(ws, salesRow, 4, s["네이버 CPC"] || 0, filledSet);
+    setCell(ws, salesRow, 5, s["네이버 GFA(0.14)"] || 0, filledSet);
+    setCell(ws, salesRow, 6, s["카카오 CPC"] || 0, filledSet);
+    setCell(ws, salesRow, 7, s["카카오 모먼트"] || 0, filledSet);
+    setCell(ws, salesRow, 8, s["타겟팅게이츠"] || 0, filledSet);
+    setCell(ws, salesRow, 9, s["모비온"] || 0, filledSet);
+    setCell(ws, salesRow, 10, s["모비데이즈(당근)"] || 0, filledSet);
+    setCell(ws, salesRow, 11, s["네이버 GFA(0.09)"] || 0, filledSet);
+    setCell(ws, salesRow, 12, s["모비데이즈"] || 0, filledSet);
+
+    // 매출2 (같은 행, O열 쪽 - 헤더가 있을 때만 기입: 옛 양식엔 타불라/기타 열이 없을 수 있음)
+    const sales2colmap = [
+      [16, "파컨 / 플레이스 (수임료 계정만 기재)"],
+      [17, "구글 애드워즈 (수임료 계정만 기재)"],
+      [18, "SNS"], [19, "ADN/롤링보드"], [20, "타불라"], [21, "기타 (GFA,당근)"],
+    ];
+    const shortLabel = { 16: "파워컨텐츠", 17: "구글", 18: "메타", 19: "ADN", 20: "타불라", 21: "기타" };
+    const sales2Row = findRowByLabelInCol(ws, "합산 매출", 15) || salesRow;
+    for (const [col, key] of sales2colmap) {
+      let headerExists = false;
+      for (let r = 1; r < sales2Row; r++) {
+        if (cellVal(ws, r, col) === shortLabel[col]) { headerExists = true; break; }
+      }
+      if (headerExists) setCell(ws, sales2Row, col, result.sales2[key], filledSet);
+    }
+
+    // 대대행 정산 상세: 네이버CPC
+    const ch = result.naver.channelTotals;
+    const agencyMap = [
+      ["화이트오렌지", 0.05, ch["화이트오렌지"]],
+      ["플러스넷", 0.1, ch["플러스넷"]],
+      ["이너웹", 0.1, ch["이너웹"]],
+      ["이너웹", 0.05, 0],
+      ["그린즈컴퍼니", 0.1, ch["그린즈컴퍼니"]],
+      ["그린즈컴퍼니", 0.05, 0],
+      ["네모넷", 0.1, ch["네모넷"]],
+      ["최정호(더이룸)", 0.13, ch["최정호13"]],
+      ["최정호(더이룸)", 0.08, ch["최정호8"]],
+    ];
+    for (const [name, rate, val] of agencyMap) {
+      const r = findAgencyRow(ws, name, rate);
+      if (r) setCell(ws, r, 4, val || 0, filledSet);
+    }
+    // 카카오CPC: 최정호(더이룸) 13% 행
+    const rKakaoCPC = findAgencyRow(ws, "최정호(더이룸)", 0.13);
+    if (rKakaoCPC) setCell(ws, rKakaoCPC, 5, result.kakaoCPC["최정호"] || 0, filledSet);
+    // 카카오모먼트: 네모넷 행 (신목련)
+    const rKakaoMoment = findAgencyRow(ws, "네모넷", 0.1);
+    if (rKakaoMoment) setCell(ws, rKakaoMoment, 6, result.kakaoMoment["신목련"] || 0, filledSet);
+
+    // 페이백상세
+    for (const company of PAYBACK_COMPANIES) {
+      const detail = result.payback.result[company];
+      if (!detail) continue;
+      const r = findPaybackRowByName(ws, company);
+      if (!r) continue;
+      setCell(ws, r, 4, detail.naver, filledSet);
+      setCell(ws, r, 5, detail.kakao, filledSet);
+      setCell(ws, r, 6, detail.moment, filledSet);
+      setCell(ws, r, 7, detail.total, filledSet);
+      setCell(ws, r, 8, detail.excl, filledSet);
+      setCell(ws, r, 9, detail.pay, filledSet);
+    }
+
+    // 요율 상이 상세 (업로드 화면에서 직접 입력한 예외 거래처)
+    if (result.rateExceptions && result.rateExceptions.length) {
+      fillRateExceptions(ws, result.rateExceptions, filledSet);
+    }
+
+    return { wb: wb기입, ws, filledSet };
+  }
+
+  // "드림헤어라인, 7, , , 22534131" 형태의 줄들을
+  // [{name, rate, powercontent, google, meta}, ...] 로 파싱
+  function parseRateExceptionInput(text) {
+    if (!text || !text.trim()) return [];
+    return text.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+      const parts = line.split(",").map((p) => p.trim());
+      const [name, rateStr, pc, gg, mt] = parts;
+      const parseNum = (s) => {
+        if (s === undefined || s === "") return null;
+        const n = parseFloat(s.replace(/,/g, "").replace("%", ""));
+        return isNaN(n) ? null : n;
+      };
+      let rate = parseNum(rateStr);
+      if (rate !== null && rate > 1) rate = rate / 100; // "7" -> 0.07 로 취급 (이미 0.xx면 그대로)
+      return {
+        name: name || "",
+        rate,
+        powercontent: parseNum(pc),
+        google: parseNum(gg),
+        meta: parseNum(mt),
+      };
+    }).filter((row) => row.name);
+  }
+
+  // 파싱된 예외 거래처 목록을 '* 요율 상이 상세' 표의 실제 위치에 그대로 써넣는다.
+  function fillRateExceptions(ws, entries, filledSet) {
+    const dims = sheetDims(ws);
+    const title = findRowByCellValue(ws, "* 요율 상이 상세", dims.rows, dims.cols);
+    if (!title) return; // 이 템플릿엔 해당 표가 없으면 조용히 건너뜀
+
+    const headerRow = title.row + 1;
+    const nameCol = title.col;         // 광고주명
+    const dataStart = headerRow + 1;
+
+    // '합계' 라벨이 나오는 행 바로 앞까지만 데이터 영역으로 인정 (안전장치 겸 범위 파악)
+    let dataEnd = dataStart;
+    while (dataEnd <= dataStart + 30) {
+      const label = cellVal(ws, dataEnd, nameCol);
+      if (label !== null && String(label).trim() === "합계") break;
+      dataEnd++;
+    }
+    const maxRows = Math.max(0, dataEnd - dataStart);
+
+    // 재실행 시 이전에 썼던 값이 그대로 남아있지 않도록, 데이터 영역 전체를 먼저 비운다
+    for (let r = dataStart; r < dataEnd; r++) {
+      for (let c = nameCol; c <= nameCol + 4; c++) setCell(ws, r, c, null, filledSet);
+    }
+
+    entries.slice(0, maxRows).forEach((entry, i) => {
+      const r = dataStart + i;
+      setCell(ws, r, nameCol, entry.name, filledSet);       // 광고주명 (문자열)
+      if (entry.rate !== null) setCell(ws, r, nameCol + 1, entry.rate, filledSet);
+      if (entry.powercontent !== null) setCell(ws, r, nameCol + 2, entry.powercontent, filledSet);
+      if (entry.google !== null) setCell(ws, r, nameCol + 3, entry.google, filledSet);
+      if (entry.meta !== null) setCell(ws, r, nameCol + 4, entry.meta, filledSet);
+    });
+
+    // 정산2의 '상이 요율' 행 = 입력된 예외 거래처 전체를 각자의 요율로 계산해서 합산
+    // (원래 템플릿은 특정 업체 한 곳씩만 하드코딩되어 있어, 예외 업체가 여러 곳이면 누락되는 문제가 있었음)
+    fillOddRateSettlement(ws, entries, filledSet);
+  }
+
+  // '* 정산2' 표의 '상이 요율' 행(파워컨텐츠/구글/메타)을,
+  // 입력된 모든 예외 거래처의 (해당 채널 금액 × 그 거래처 요율) 합계로 채운다.
+  function fillOddRateSettlement(ws, entries, filledSet) {
+    const dims = sheetDims(ws);
+    const title2 = findRowByCellValue(ws, "* 정산2", dims.rows, dims.cols);
+    if (!title2) return;
+
+    const header2Row = title2.row + 1;
+    const oddRateRow = findRowByLabelInCol(ws, "상이 요율", title2.col);
+    if (!oddRateRow) return;
+
+    // 정산2 자체의 헤더에서 파워컨텐츠/구글/메타가 어느 열인지 찾기
+    const channelCol = {};
+    for (let c = title2.col; c <= dims.cols; c++) {
+      const label = cellVal(ws, header2Row, c);
+      if (label === "파워컨텐츠" || label === "구글" || label === "메타") channelCol[label] = c;
+    }
+
+    const fieldForChannel = { "파워컨텐츠": "powercontent", "구글": "google", "메타": "meta" };
+    for (const [channelName, col] of Object.entries(channelCol)) {
+      const field = fieldForChannel[channelName];
+      let sum = 0, hasAny = false;
+      entries.forEach((entry) => {
+        const val = entry[field];
+        if (typeof val === "number" && typeof entry.rate === "number") {
+          sum += val * entry.rate;
+          hasAny = true;
+        }
+      });
+      // 이전 실행에서 값이 있었다가 이번엔 없어진 경우에도 셀을 비워서 옛 값이 남지 않게 한다
+      setCell(ws, oddRateRow, col, hasAny ? sum : null, filledSet);
+    }
+  }
+
+  // 매출기입 템플릿에 이미 들어있는 '요율 상이 상세' 목록을 읽어온다 (입력칸 미리 채우기용)
+  function readExistingRateExceptions(ws) {
+    const dims = sheetDims(ws);
+    const title = findRowByCellValue(ws, "* 요율 상이 상세", dims.rows, dims.cols);
+    if (!title) return [];
+    const headerRow = title.row + 1;
+    const nameCol = title.col;
+    const dataStart = headerRow + 1;
+    const entries = [];
+    let r = dataStart;
+    while (r <= dataStart + 30) {
+      const name = cellVal(ws, r, nameCol);
+      if (name !== null && String(name).trim() === "합계") break;
+      if (name !== null) {
+        entries.push({
+          name: String(name),
+          rate: cellVal(ws, r, nameCol + 1),
+          powercontent: cellVal(ws, r, nameCol + 2),
+          google: cellVal(ws, r, nameCol + 3),
+          meta: cellVal(ws, r, nameCol + 4),
+        });
+      }
+      r++;
+    }
+    return entries;
+  }
+
+  // ---------------------------------------------------------------------
+  // 시트를 실제 스프레드시트처럼 HTML 표로 렌더링
+  // ---------------------------------------------------------------------
+
+  function computeUsedRange(ws) {
+    let minR = Infinity, minC = Infinity, maxR = 0, maxC = 0;
+    for (const key of Object.keys(ws)) {
+      if (key[0] === "!") continue;
+      const addr = XLSX.utils.decode_cell(key);
+      if (addr.r < minR) minR = addr.r;
+      if (addr.c < minC) minC = addr.c;
+      if (addr.r > maxR) maxR = addr.r;
+      if (addr.c > maxC) maxC = addr.c;
+    }
+    if (minR === Infinity) return { r0: 0, c0: 0, r1: 0, c1: 0 };
+    return { r0: minR, c0: minC, r1: maxR, c1: maxC };
+  }
+
+  function colLetter(c0) { // 0-based
+    return XLSX.utils.encode_col(c0);
+  }
+
+  function argbToCss(rgb) {
+    if (!rgb) return null;
+    const hex = rgb.length === 8 ? rgb.slice(2) : rgb; // ARGB -> RGB
+    return "#" + hex;
+  }
+
+  function renderSheetAsTable(ws, filledSet) {
+    const range = computeUsedRange(ws);
+    const evaluator = FormulaEval.createSheetEvaluator(ws);
+
+    // 병합 셀 occupancy 맵
+    const merges = ws["!merges"] || [];
+    const covered = new Set();
+    const spanAt = {};
+    for (const m of merges) {
+      const rs = m.e.r - m.s.r + 1;
+      const cs = m.e.c - m.s.c + 1;
+      if (rs > 1 || cs > 1) spanAt[m.s.r + "," + m.s.c] = { rowspan: rs, colspan: cs };
+      for (let r = m.s.r; r <= m.e.r; r++) {
+        for (let c = m.s.c; c <= m.e.c; c++) {
+          if (r === m.s.r && c === m.s.c) continue;
+          covered.add(r + "," + c);
+        }
+      }
+    }
+
+    // 행 단위로 "라벨(헤더) 행" 여부를 미리 판단: 값이 있는 셀이 전부 문자열이면 헤더성 행으로 간주
+    const boldRows = new Set();
+    for (let r = range.r0; r <= range.r1; r++) {
+      let hasValue = false, allString = true;
+      for (let c = range.c0; c <= range.c1; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[addr];
+        if (!cell || cell.v === undefined || cell.v === "") continue;
+        hasValue = true;
+        if (typeof cell.v !== "string") { allString = false; break; }
+      }
+      if (hasValue && allString) boldRows.add(r);
+    }
+
+    // 열 너비
+    const cols = ws["!cols"] || [];
+
+    let html = "<table class='st-sheet'><colgroup><col style='width:34px'>";
+    for (let c = range.c0; c <= range.c1; c++) {
+      const w = cols[c] && cols[c].wpx ? cols[c].wpx : 90;
+      html += `<col style="width:${w}px">`;
+    }
+    html += "</colgroup><thead><tr><th class='st-colhead st-corner'></th>";
+    for (let c = range.c0; c <= range.c1; c++) {
+      html += `<th class="st-colhead">${colLetter(c)}</th>`;
+    }
+    html += "</tr></thead><tbody>";
+
+    for (let r = range.r0; r <= range.r1; r++) {
+      html += `<tr><th class="st-rowhead">${r + 1}</th>`;
+      const rowBold = boldRows.has(r);
+      for (let c = range.c0; c <= range.c1; c++) {
+        if (covered.has(r + "," + c)) continue;
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[addr];
+        const span = spanAt[r + "," + c];
+        const spanAttrs = span ? ` rowspan="${span.rowspan}" colspan="${span.colspan}"` : "";
+
+        let text = "", isFilled = filledSet && filledSet.has(addr);
+        let styles = [];
+        let cls = [];
+
+        if (cell) {
+          const hasFormula = !!cell.f;
+          const computed = hasFormula ? evaluator.getValue(addr) : null;
+          const isPercent = typeof cell.z === "string" && cell.z.indexOf("%") !== -1;
+          const isNumber = hasFormula ? typeof computed === "number" : typeof cell.v === "number";
+
+          if (isFilled) {
+            text = cell.v.toLocaleString("ko-KR");
+          } else if (hasFormula) {
+            if (computed === null) text = "—";
+            else if (isPercent) text = Math.round(computed * 100) + "%";
+            else text = Math.round(computed).toLocaleString("ko-KR");
+          } else if (cell.w !== undefined) {
+            text = cell.w; // 원본 서식(예: 14.50%)을 그대로 사용
+          } else if (isNumber) {
+            text = cell.v.toLocaleString("ko-KR");
+          } else {
+            text = String(cell.v).replace(/\r?\n/g, " ");
+          }
+
+          // 정렬
+          if (isNumber) cls.push("st-num");
+          else if (rowBold) styles.push("text-align:center");
+
+          // 볼드 (헤더성 행, 또는 '*'/'[' 로 시작하는 타이틀 셀)
+          const isTitleCell = typeof cell.v === "string" && /^[\*\[]/.test(cell.v.trim());
+          if (rowBold || isTitleCell) styles.push("font-weight:700");
+
+          // 수식 셀은 살짝 다른 색으로 - "여기는 자동 계산됨"을 표시
+          if (hasFormula && !isFilled) cls.push("st-formula");
+
+          // 배경색 (원본 서식) — 채워진 값이 있으면 초록 강조가 우선
+          if (!isFilled && cell.s && cell.s.patternType === "solid" && cell.s.fgColor) {
+            const css = argbToCss(cell.s.fgColor.rgb);
+            if (css) styles.push("background:" + css);
+          }
+        }
+        if (isFilled) cls.push("st-filled");
+        if (!cell) cls.push("st-empty");
+
+        html += `<td${spanAttrs} class="${cls.join(" ")}" style="${styles.join(";")}">${text}</td>`;
+      }
+      html += "</tr>";
+    }
+    html += "</tbody></table>";
+    return html;
+  }
+
+  // =====================================================================
+  // UI 로직
+  // =====================================================================
+
+  const state = { 원본: null, 추가시트: null, 검색팀매출: null, 기입템플릿: null, 검색팀시트: null, 기입시트: null };
+  const fileNames = {};
+
+  function setStepFile(key, name, error) {
+    const step = document.getElementById("step-" + key);
+    step.classList.remove("st-done", "st-error");
+    const fileEl = step.querySelector(".st-step-file");
+    const errEl = step.querySelector(".st-step-err");
+    if (error) {
+      step.classList.add("st-error");
+      fileEl.textContent = "";
+      errEl.textContent = error;
+    } else {
+      step.classList.add("st-done");
+      fileEl.textContent = "✓ " + name;
+      errEl.textContent = "";
+    }
+    updateRunButton();
+  }
+
+  function updateRunButton() {
+    const ready = state.원본 && state.검색팀매출 && state.기입템플릿 && state.검색팀시트 && state.기입시트;
+    document.getElementById("runBtn").disabled = !ready;
+  }
+
+  // ---------------------------------------------------------------------
+  // 요율 상이 상세 - 표 형태 입력 UI
+  // ---------------------------------------------------------------------
+
+  function addRateExceptionRow(values) {
+    values = values || {};
+    const highlightFields = values.highlightFields || new Set();
+    const tbody = document.getElementById("rateExceptionTbody");
+    const tr = document.createElement("tr");
+    const fields = ["name", "rate", "powercontent", "google", "meta"];
+    fields.forEach((f) => {
+      const td = document.createElement("td");
+      const input = document.createElement("input");
+      input.setAttribute("data-field", f);
+      let val = values[f];
+      if (f === "rate" && typeof val === "number") {
+        val = Math.round((val <= 1 ? val * 100 : val) * 10) / 10; // 0.07 -> 7
+      }
+      input.value = (val === null || val === undefined) ? "" : val;
+      input.placeholder = f === "name" ? "광고주명" : f === "rate" ? "예: 7" : "";
+      if (f === "name" || f === "rate") {
+        input.addEventListener("change", saveFixedRateDefaults);
+      }
+      if (highlightFields.has(f)) {
+        td.className = "dash-manual-hint";
+        td.title = "전월에 이 채널에 값이 있었습니다 — 이번 달 값을 입력해 주세요";
+      }
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+
+    const tdFixed = document.createElement("td");
+    tdFixed.className = "dash-manual-fixed-cell";
+    const fixedCheckbox = document.createElement("input");
+    fixedCheckbox.type = "checkbox";
+    fixedCheckbox.setAttribute("data-field", "fixed");
+    fixedCheckbox.checked = !!values.fixed;
+    fixedCheckbox.title = "체크하면 광고주명·요율을 다음 달에도 자동으로 기억합니다";
+    fixedCheckbox.addEventListener("change", saveFixedRateDefaults);
+    tdFixed.appendChild(fixedCheckbox);
+    tr.appendChild(tdFixed);
+
+    const tdDel = document.createElement("td");
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "dash-manual-row-del";
+    delBtn.textContent = "×";
+    delBtn.title = "이 행 삭제";
+    delBtn.addEventListener("click", () => { tr.remove(); saveFixedRateDefaults(); });
+    tdDel.appendChild(delBtn);
+    tr.appendChild(tdDel);
+    tbody.appendChild(tr);
+  }
+
+  // 체크된('고정') 행들의 광고주명·요율만 모아서 저장해둔다 (다음 달 자동 채우기용)
+  async function saveFixedRateDefaults() {
+    const rows = document.querySelectorAll("#rateExceptionTbody tr");
+    const fixedList = [];
+    rows.forEach((tr) => {
+      const fixedBox = tr.querySelector('input[data-field="fixed"]');
+      if (!fixedBox || !fixedBox.checked) return;
+      const name = tr.querySelector('input[data-field="name"]').value.trim();
+      const rateStr = tr.querySelector('input[data-field="rate"]').value.trim();
+      if (!name) return;
+      const rate = rateStr === "" ? null : parseFloat(rateStr.replace(/,/g, ""));
+      fixedList.push({ name, rate: isNaN(rate) ? null : rate });
+    });
+    try {
+      if (window.storage) await window.storage.set(RATE_EXCEPTION_FIXED_KEY, JSON.stringify(fixedList), false);
+    } catch (e) { /* 저장 실패해도 화면 입력 자체는 계속 쓸 수 있게 조용히 무시 */ }
+  }
+
+  async function loadFixedRateDefaults() {
+    try {
+      if (!window.storage) return [];
+      const res = await window.storage.get(RATE_EXCEPTION_FIXED_KEY, false);
+      return res ? JSON.parse(res.value) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function getRateExceptionEntries() {
+    const rows = document.querySelectorAll("#rateExceptionTbody tr");
+    const parseNum = (s) => {
+      if (!s) return null;
+      const n = parseFloat(String(s).replace(/,/g, "").replace("%", ""));
+      return isNaN(n) ? null : n;
+    };
+    const entries = [];
+    rows.forEach((tr) => {
+      const get = (f) => {
+        const el = tr.querySelector('input[data-field="' + f + '"]');
+        return el ? el.value.trim() : "";
+      };
+      const name = get("name");
+      if (!name) return;
+      let rate = parseNum(get("rate"));
+      if (rate !== null && rate > 1) rate = rate / 100;
+      entries.push({
+        name,
+        rate,
+        powercontent: parseNum(get("powercontent")),
+        google: parseNum(get("google")),
+        meta: parseNum(get("meta")),
+      });
+    });
+    return entries;
+  }
+
+  const RATE_EXCEPTION_FIXED_KEY = "rateExceptionFixed";
+
+  // 저장된 전월 '요율 상이 상세' 데이터에서, 거래처별로 지난달에 값이 있었던 채널을 찾는다.
+  // (전월에 채웠던 칸을 이번 달에도 표시해서 "여기 채우면 됨"을 알려주기 위함)
+  async function getPrevMonthRateExceptionHints() {
+    const prevPeriod = computePreviousPeriod(state.검색팀시트);
+    if (!prevPeriod || !window.storage) return {};
+    try {
+      const res = await window.storage.get(HISTORY_PREFIX + prevPeriod, false);
+      if (!res) return {};
+      const prevModel = JSON.parse(res.value);
+      const sec = prevModel.sections && prevModel.sections.find((s) => s.key === "요율상이");
+      if (!sec || !sec.model) return {};
+
+      const fieldForLabel = { "파워컨텐츠": "powercontent", "구글": "google", "메타": "meta" };
+      const hints = {}; // { 거래처명: Set(필드명) }
+      sec.model.rows.forEach((row) => {
+        const name = row.label.trim();
+        sec.model.colLabels.forEach((label, i) => {
+          const field = fieldForLabel[label];
+          if (!field) return;
+          const cell = row.cells[i];
+          if (cell && typeof cell.raw === "number" && cell.raw !== 0) {
+            if (!hints[name]) hints[name] = new Set();
+            hints[name].add(field);
+          }
+        });
+      });
+      return hints;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function refreshRateExceptionInputs() {
+    const tbody = document.getElementById("rateExceptionTbody");
+    tbody.innerHTML = "";
+    let entries = [];
+    if (state.기입템플릿 && state.기입시트) {
+      try {
+        const ws = state.기입템플릿.Sheets[state.기입시트];
+        entries = readExistingRateExceptions(ws);
+      } catch (e) { /* 표가 없거나 형식이 다르면 그냥 빈 입력으로 시작 */ }
+    }
+
+    // '고정'으로 저장해둔 거래처(광고주명·요율)를 이번 달 목록과 합침
+    const fixedDefaults = await loadFixedRateDefaults();
+    fixedDefaults.forEach((fd) => {
+      const existing = entries.find((e) => e.name === fd.name);
+      if (existing) {
+        existing.fixed = true;
+      } else {
+        entries.push({ name: fd.name, rate: fd.rate, powercontent: null, google: null, meta: null, fixed: true });
+      }
+    });
+
+    // 전월에 값이 있던 채널을 찾아서, 해당 입력칸만 표시되도록 표시 정보를 붙인다
+    const hints = await getPrevMonthRateExceptionHints();
+    entries.forEach((e) => {
+      if (hints[e.name]) e.highlightFields = hints[e.name];
+    });
+
+    if (entries.length === 0) entries = [{}];
+    entries.forEach((e) => addRateExceptionRow(e));
+  }
+
+  document.getElementById("rateExceptionAddBtn").addEventListener("click", () => addRateExceptionRow());
+
+  // 엑셀에서 여러 칸을 복사해서 그대로 붙여넣기 지원 (탭=열 구분, 줄바꿈=행 구분)
+  const RATE_EXCEPTION_FIELDS = ["name", "rate", "powercontent", "google", "meta"];
+  document.getElementById("rateExceptionTbody").addEventListener("paste", (e) => {
+    const target = e.target;
+    if (!target.matches('input[data-field]')) return;
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!text || !/[\t\n]/.test(text)) return; // 셀 하나짜리 값이면 기본 붙여넣기 동작 그대로 둠
+    e.preventDefault();
+
+    const startField = target.getAttribute("data-field");
+    const startFieldIdx = RATE_EXCEPTION_FIELDS.indexOf(startField);
+    const startRowEl = target.closest("tr");
+    let rows = Array.from(document.querySelectorAll("#rateExceptionTbody tr"));
+    let startRowIdx = rows.indexOf(startRowEl);
+
+    const lines = text.replace(/\r/g, "").split("\n").filter((line, i, arr) => !(i === arr.length - 1 && line === ""));
+    lines.forEach((line, li) => {
+      const values = line.split("\t");
+      let rowEl = rows[startRowIdx + li];
+      if (!rowEl) {
+        addRateExceptionRow();
+        rows = Array.from(document.querySelectorAll("#rateExceptionTbody tr"));
+        rowEl = rows[rows.length - 1];
+      }
+      values.forEach((val, ci) => {
+        const fieldIdx = startFieldIdx + ci;
+        if (fieldIdx < 0 || fieldIdx >= RATE_EXCEPTION_FIELDS.length) return;
+        const input = rowEl.querySelector('input[data-field="' + RATE_EXCEPTION_FIELDS[fieldIdx] + '"]');
+        if (input) input.value = val.trim();
+      });
+    });
+  });
+
+  // 엑셀처럼 Enter로 아래 행 같은 칸으로, 화살표 위/아래로 이동
+  document.getElementById("rateExceptionTbody").addEventListener("keydown", (e) => {
+    const target = e.target;
+    if (!target.matches('input[data-field]')) return;
+    if (e.key !== "Enter" && e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const field = target.getAttribute("data-field");
+    const rows = Array.from(document.querySelectorAll("#rateExceptionTbody tr"));
+    const curIdx = rows.indexOf(target.closest("tr"));
+    const nextIdx = (e.key === "ArrowUp") ? curIdx - 1 : curIdx + 1;
+    let nextRow = rows[nextIdx];
+    if (!nextRow && (e.key === "Enter" || e.key === "ArrowDown")) {
+      addRateExceptionRow();
+      const newRows = document.querySelectorAll("#rateExceptionTbody tr");
+      nextRow = newRows[newRows.length - 1];
+    }
+    if (nextRow) {
+      const nextInput = nextRow.querySelector('input[data-field="' + field + '"]');
+      if (nextInput) { nextInput.focus(); nextInput.select(); }
+    }
+  });
+
+  refreshRateExceptionInputs(); // 초기 빈 행 하나 표시
+
+  function showGlobalError(msg) {
+    const el = document.getElementById("globalErr");
+    if (!msg) { el.classList.remove("st-show"); el.textContent = ""; return; }
+    el.textContent = msg;
+    el.classList.add("st-show");
+  }
+
+  // 아티팩트 샌드박스에서는 브라우저 기본 confirm()이 차단/자동취소될 수 있어,
+  // 화면 안에 직접 그리는 확인창으로 대체한다.
+  function customConfirm(message) {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById("confirmOverlay");
+      document.getElementById("confirmMsg").textContent = message;
+      overlay.classList.add("st-show");
+
+      const okBtn = document.getElementById("confirmOkBtn");
+      const cancelBtn = document.getElementById("confirmCancelBtn");
+
+      function cleanup(result) {
+        overlay.classList.remove("st-show");
+        okBtn.removeEventListener("click", onOk);
+        cancelBtn.removeEventListener("click", onCancel);
+        overlay.removeEventListener("click", onOverlayClick);
+        resolve(result);
+      }
+      function onOk() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+      function onOverlayClick(e) { if (e.target === overlay) cleanup(false); }
+
+      okBtn.addEventListener("click", onOk);
+      cancelBtn.addEventListener("click", onCancel);
+      overlay.addEventListener("click", onOverlayClick);
+    });
+  }
+
+  // "매출보고양식_6월" -> 6, "6월" -> 6 처럼 이름에서 월(月) 숫자를 뽑아낸다.
+  function extractMonthFromName(text) {
+    const m = String(text || "").match(/(\d{1,2})\s*월/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+  // "26.07" -> 7 처럼 'YY.MM' 형식 시트명에서 월 숫자를 뽑아낸다.
+  function extractMonthFromYYMM(text) {
+    const m = String(text || "").match(/\.(\d{1,2})$/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+  function findSheetEndingInMonth(sheetNames, monthNum) {
+    if (!monthNum) return null;
+    const padded = String(monthNum).padStart(2, "0");
+    return sheetNames.find((n) => new RegExp("\\.0*" + monthNum + "$").test(n) || n.endsWith("." + padded)) || null;
+  }
+  function findSheetContainingMonthWord(sheetNames, monthNum) {
+    if (!monthNum) return null;
+    return sheetNames.find((n) => extractMonthFromName(n) === monthNum) || null;
+  }
+
+  // 매출기입 템플릿에서 고른 월(예: '매출보고양식_6월')에 맞춰, 검색팀 매출군 시트도 같은 달로 자동 전환
+  function syncSearchSheetToFillMonth() {
+    if (!state.검색팀매출 || !state.기입시트) return;
+    const monthNum = extractMonthFromName(state.기입시트);
+    const match = findSheetEndingInMonth(state.검색팀매출.SheetNames, monthNum);
+    if (match && match !== state.검색팀시트) {
+      state.검색팀시트 = match;
+      const sel = document.getElementById("sheetSelect");
+      if (sel) sel.value = match;
+    }
+  }
+  // 반대 방향: 검색팀 매출군에서 고른 월(예: '26.06')에 맞춰, 매출기입 템플릿 시트도 자동 전환
+  function syncFillSheetToSearchMonth() {
+    if (!state.기입템플릿 || !state.검색팀시트) return;
+    const monthNum = extractMonthFromYYMM(state.검색팀시트);
+    const match = findSheetContainingMonthWord(state.기입템플릿.SheetNames, monthNum);
+    if (match && match !== state.기입시트) {
+      state.기입시트 = match;
+      const sel = document.getElementById("fillSheetSelect");
+      if (sel) sel.value = match;
+      refreshRateExceptionInputs();
+    }
+  }
+
+  document.querySelectorAll('input[type=file]').forEach((input) => {
+    input.addEventListener("change", async (e) => {
+      const key = e.target.getAttribute("data-key");
+      const file = e.target.files[0];
+      if (!file) return;
+      showGlobalError(null);
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array", cellStyles: true });
+        state[key] = wb;
+        fileNames[key] = file.name;
+        setStepFile(key, file.name, null);
+
+        if (key === "검색팀매출") {
+          const sel = document.getElementById("sheetSelect");
+          sel.innerHTML = "";
+          wb.SheetNames.forEach((name) => {
+            const opt = document.createElement("option");
+            opt.value = name; opt.textContent = name;
+            sel.appendChild(opt);
+          });
+          sel.style.display = "inline-block";
+
+          // 매출기입 템플릿이 먼저 올라와 있으면 그 월에 맞는 시트를 우선 선택
+          let defaultSheet = wb.SheetNames[0];
+          if (state.기입시트) {
+            const monthNum = extractMonthFromName(state.기입시트);
+            const matched = findSheetEndingInMonth(wb.SheetNames, monthNum);
+            if (matched) defaultSheet = matched;
+          }
+          state.검색팀시트 = defaultSheet;
+          sel.value = defaultSheet;
+          sel.onchange = () => { state.검색팀시트 = sel.value; syncFillSheetToSearchMonth(); updateRunButton(); };
+        }
+        if (key === "기입템플릿") {
+          applyFillTemplateWorkbook(wb, file.name);
+          // 이미 '고정'해둔 상태에서 새 파일을 올리면, 고정된 내용도 새 파일로 갱신
+          const fixCheckbox = document.getElementById("fixTemplateCheckbox");
+          if (fixCheckbox.checked) {
+            const arrbuf2 = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+            await saveFixedTemplate(arrbuf2, file.name);
+            const statusEl = document.getElementById("fixedTemplateStatus");
+            statusEl.style.display = "block";
+            statusEl.textContent = `고정된 템플릿을 "${file.name}"으로 갱신했습니다.`;
+          }
+        }
+        updateRunButton(); // 기본 선택된 시트값까지 반영해서 다시 확인
+        if (key === "원본" && !state.추가시트) {
+          // 원본에 표1이 내장되어 있으면 추가시트 없이도 진행 가능하도록 안내
+          const embedded = findSheetByLabel(wb, "표1");
+          if (embedded) {
+            const step2 = document.getElementById("step-추가시트");
+            step2.querySelector(".st-step-desc").textContent = "원본에 담당자 매핑이 포함되어 있어 생략 가능합니다";
+          }
+        }
+      } catch (err) {
+        setStepFile(key, null, "읽기 실패: " + err.message);
+      }
+    });
+  });
+
+  document.getElementById("runBtn").addEventListener("click", async () => {
+    showGlobalError(null);
+    try {
+      const wb추가시트 = state.추가시트 || state.원본; // 원본에 내장된 경우 자기 자신에서 찾음
+      const result = {
+        settle: computeSettlementTotals(state.원본),
+        naver: computeNaverChannelTotals(state.원본, wb추가시트),
+        kakaoCPC: computeKakaoMarketerTotals(state.원본, "카카오CPC"),
+        kakaoMoment: computeKakaoMarketerTotals(state.원본, "카카오모먼트"),
+        sales2: computeSearchTeamSales(state.검색팀매출, state.검색팀시트),
+        payback: computePaybackDetail(state.검색팀매출, state.검색팀시트),
+        rateExceptions: getRateExceptionEntries(),
+      };
+      await renderResults(result);
+    } catch (err) {
+      showGlobalError("계산 중 문제가 발생했습니다: " + err.message);
+    }
+  });
+
+  function fmt(n) {
+    if (n === null || n === undefined) return "—";
+    return n.toLocaleString("ko-KR");
+  }
+
+  // ---------------------------------------------------------------------
+  // 대시보드용 표 생성: 매출기입 파일의 실제 셀(값 + 수식 계산 결과)을 읽어서
+  // 라벨/제목 기준으로 구간을 통째로 추출 -> 깔끔한 표로 렌더링
+  // ---------------------------------------------------------------------
+
+  // '요율'이라는 글자가 들어가도 실제로는 금액인 라벨이 있음(예: 정산2의 '기본 요율'/'상이 요율' 행은
+  // 매출*요율로 계산된 '금액'이지 요율 자체가 아님) -> 정확히 이 이름과 일치할 때만 퍼센트로 처리
+  const PERCENT_LABELS = new Set(["요율", "전월 대비 상승률", "점유율"]);
+  function isPercentLabel(label) { return PERCENT_LABELS.has(String(label).trim()); }
+
+  function readCellAny(ws, evaluator, row, col) {
+    const addr = XLSX.utils.encode_cell({ r: row - 1, c: col - 1 });
+    const cell = ws[addr];
+    if (!cell) return { value: null, hasFormula: false, addr };
+    if (cell.f) return { value: evaluator.getValue(addr), hasFormula: true, addr };
+    return { value: cell.v, hasFormula: false, addr };
+  }
+
+  function extractSection(ws, titleText, labelCol, dataColStart) {
+    const dims = sheetDims(ws);
+    const title = findRowByCellValue(ws, titleText, dims.rows, dims.cols);
+    if (!title) return null;
+    const headerRow = title.row + 1;
+
+    const cols = [];
+    let c = dataColStart;
+    while (cellVal(ws, headerRow, c) !== null) {
+      cols.push({ col: c, label: String(cellVal(ws, headerRow, c)) });
+      c++;
+    }
+
+    const rows = [];
+    let r = headerRow + 1;
+    let blanks = 0;
+    while (r <= headerRow + 60) {
+      const label = cellVal(ws, r, labelCol);
+      if (label === null) {
+        blanks++;
+        if (blanks >= 2) break;
+        r++;
+        continue;
+      }
+      blanks = 0;
+      if (typeof label === "string" && /^[\*\[]/.test(label.trim())) break;
+      rows.push({ row: r, label: String(label) });
+      r++;
+    }
+    return { cols, rows };
+  }
+
+  // ws/evaluator에서 표 하나를 렌더링 가능한 "순수 데이터 모델"로 뽑아낸다.
+  // (JSON으로 저장했다가 나중에 그대로 다시 그릴 수 있도록, HTML이 아니라 데이터로 분리)
+  function computeSectionModel(ws, evaluator, filledSet, section, opts) {
+    opts = opts || {};
+    if (!section || section.cols.length === 0) return null;
+
+    const grid = section.rows.map((rowInfo) =>
+      section.cols.map((c) => readCellAny(ws, evaluator, rowInfo.row, c.col))
+    );
+
+    const keepColIdx = section.cols.map((c, i) =>
+      grid.some((row) => row[i].value !== null && row[i].value !== undefined && row[i].value !== "")
+    );
+    const cols = section.cols.filter((c, i) => keepColIdx[i]);
+
+    const rateRow = section.rows.find((r) => r.label.trim() === "요율");
+    const nameCounts = {};
+    cols.forEach((c) => { nameCounts[c.label] = (nameCounts[c.label] || 0) + 1; });
+    const colLabels = cols.map((c) => {
+      if (nameCounts[c.label] > 1 && rateRow) {
+        const rateVal = readCellAny(ws, evaluator, rateRow.row, c.col).value;
+        if (typeof rateVal === "number") return `${c.label} (${Math.round(rateVal * 100)}%)`;
+      }
+      return c.label;
+    });
+
+    const modelRows = [];
+    section.rows.forEach((rowInfo, rIdx) => {
+      const isPercentRow = isPercentLabel(rowInfo.label);
+      const isTotalRow = /^합계$|^합산/.test(rowInfo.label.trim());
+
+      if (opts.hideEmptyRows && !isTotalRow) {
+        const hasAnyData = cols.some((c) => {
+          if (/요율/.test(c.label)) return false;
+          const v = grid[rIdx][section.cols.indexOf(c)].value;
+          return typeof v === "number" && v !== 0;
+        });
+        if (!hasAnyData) return;
+      }
+
+      const cells = cols.map((c) => {
+        const cIdx = section.cols.indexOf(c);
+        const { value, hasFormula, addr } = grid[rIdx][cIdx];
+        const isFilled = filledSet && filledSet.has(addr);
+        const isPercent = isPercentRow || isPercentLabel(c.label);
+
+        let cls = "", text;
+        if (value === null || value === undefined || value === "") { text = "–"; cls = "dash-blank"; }
+        else if (typeof value === "number" && isNaN(value)) { text = "–"; cls = "dash-blank"; }
+        else if (typeof value !== "number") {
+          text = String(value);
+          if (text === "undefined" || text === "null") { text = "–"; cls = "dash-blank"; }
+        }
+        else if (isPercent) {
+          // 네이버_멘토뱅크 요율은 반올림하면 14.5%가 14%/15%로 뭉개지므로 소수점 1자리까지 표기
+          const decimals = c.label.trim() === "네이버_멘토뱅크" ? 1 : 0;
+          text = (value * 100).toFixed(decimals) + "%";
+        }
+        else { text = Math.round(value).toLocaleString("ko-KR"); }
+
+        if (isFilled) cls = "dash-filled";
+        else if (hasFormula && cls !== "dash-blank") cls = (cls ? cls + " " : "") + "dash-formula";
+        const raw = typeof value === "number" && !isNaN(value) ? value : null;
+        return { text, cls, raw, addr, isPercent };
+      });
+
+      modelRows.push({ label: rowInfo.label, isTotal: isTotalRow, cells });
+    });
+
+    return { colLabels, rows: modelRows };
+  }
+
+  // 데이터 모델 -> HTML (저장했다가 불러온 데이터든, 방금 계산한 데이터든 동일하게 렌더링)
+  function renderSectionModel(model, sectionKey) {
+    if (!model) {
+      return `<div class="dash-table-wrap"><div style="padding:16px;color:#8a948c;font-size:12px;">표를 찾을 수 없습니다.</div></div>`;
+    }
+    let html = '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>구분</th>';
+    model.colLabels.forEach((label) => {
+      const isTotalCol = label === "총합계";
+      html += `<th class="${isTotalCol ? "dash-total-col-head" : ""}">${label}</th>`;
+    });
+    html += "</tr></thead><tbody>";
+    model.rows.forEach((row, rowIdx) => {
+      html += `<tr class="${row.isTotal ? "dash-total-row" : ""}"><td class="dash-rowlabel">${row.label}</td>`;
+      row.cells.forEach((cell, cellIdx) => {
+        const editAttrs = sectionKey !== undefined
+          ? ` data-editable="1" data-sec="${sectionKey}" data-row="${rowIdx}" data-cell="${cellIdx}"` +
+            ` data-raw="${cell.raw === null || cell.raw === undefined ? "" : cell.raw}"` +
+            ` data-percent="${cell.isPercent ? "1" : "0"}" data-addr="${cell.addr || ""}"`
+          : "";
+        html += `<td class="${cell.cls}"${editAttrs}>${cell.text}</td>`;
+      });
+      html += "</tr>";
+    });
+    html += "</tbody></table></div>";
+    return html;
+  }
+
+  function sectionTableHTML(ws, evaluator, filledSet, section, opts) {
+    return renderSectionModel(computeSectionModel(ws, evaluator, filledSet, section, opts));
+  }
+
+  const CAT_LABEL_SHORTEN = {
+    "이레컴즈 대전센터": "직접", "대대행사 통합": "대대행", "합산 매출": "합산매출",
+    "전월 매출": "전월매출", "전월 대비 상승률": "전월대비", "전월 정산 금액": "전월정산",
+    "전월 합산": "전월합산", "기본 요율": "기본요율", "상이 요율": "상이요율",
+    "페이백 지출": "페이백", "대대행사 지출": "대대행지출", "정산 잔액": "정산잔액",
+  };
+  function shortenCatLabel(label) {
+    const trimmed = label.trim();
+    return CAT_LABEL_SHORTEN[trimmed] || trimmed;
+  }
+
+  // 항목이 많고(10개) 구분이 적은(요율/직접/대대행/합산 등) 표는 가로로 늘어놓으면
+  // 화면 밖으로 넘쳐버리므로, 항목을 행으로 · 구분을 열로 뒤집어서(transpose) 렌더링한다.
+  function sectionTableHTMLTransposed(ws, evaluator, filledSet, section) {
+    if (!section || section.cols.length === 0) {
+      return `<div class="dash-table-wrap"><div style="padding:16px;color:#8a948c;font-size:12px;">표를 찾을 수 없습니다.</div></div>`;
+    }
+    // section.cols = 항목(네이버CPC 등) -> 뒤집으면 행
+    // section.rows = 구분(요율/직접/대대행/합산 등) -> 뒤집으면 열
+    const items = section.cols;
+    const cats = section.rows;
+
+    const grid = items.map((item) => cats.map((cat) => readCellAny(ws, evaluator, cat.row, item.col)));
+
+    // 모든 항목에서 값이 전부 비어있는 구분(열)은 제거
+    const keepCatIdx = cats.map((cat, j) => grid.some((row) => row[j].value !== null && row[j].value !== undefined && row[j].value !== ""));
+    const keptCats = cats.filter((c, j) => keepCatIdx[j]);
+
+    // 같은 이름의 항목(예: '네이버 GFA'가 요율 다른 두 항목)이 있으면 요율을 붙여서 구분
+    const rateCat = cats.find((c) => c.label.trim() === "요율");
+    const nameCounts = {};
+    items.forEach((it) => { nameCounts[it.label] = (nameCounts[it.label] || 0) + 1; });
+    const itemLabels = items.map((it) => {
+      if (nameCounts[it.label] > 1 && rateCat) {
+        const rateVal = readCellAny(ws, evaluator, rateCat.row, it.col).value;
+        if (typeof rateVal === "number") return `${it.label} (${Math.round(rateVal * 100)}%)`;
+      }
+      return it.label;
+    });
+
+    let html = '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>항목</th>';
+    for (const cat of keptCats) html += `<th>${shortenCatLabel(cat.label)}</th>`;
+    html += "</tr></thead><tbody>";
+
+    items.forEach((item, iIdx) => {
+      html += `<tr><td class="dash-rowlabel">${itemLabels[iIdx]}</td>`;
+      keptCats.forEach((cat) => {
+        const cIdx = cats.indexOf(cat);
+        const { value, hasFormula, addr } = grid[iIdx][cIdx];
+        const isFilled = filledSet && filledSet.has(addr);
+        const isPercent = isPercentLabel(cat.label);
+
+        let cls = "", text;
+        if (value === null || value === undefined || value === "") { text = "–"; cls = "dash-blank"; }
+        else if (typeof value === "number" && isNaN(value)) { text = "–"; cls = "dash-blank"; }
+        else if (typeof value !== "number") {
+          text = String(value);
+          if (text === "undefined" || text === "null") { text = "–"; cls = "dash-blank"; }
+        }
+        else if (isPercent) { text = Math.round(value * 100) + "%"; }
+        else { text = Math.round(value).toLocaleString("ko-KR"); }
+
+        if (isFilled) cls = "dash-filled";
+        else if (hasFormula && cls !== "dash-blank") cls = (cls ? cls + " " : "") + "dash-formula";
+
+        html += `<td class="${cls}">${text}</td>`;
+      });
+      html += "</tr>";
+    });
+    html += "</tbody></table></div>";
+    return html;
+  }
+
+  const DASHBOARD_SECTIONS = [
+    { key: "매출1", title: "매출1", note: "이레컴즈 직접 매출 항목별 요약", titleText: "* 매출1", labelCol: 2, colStart: 3 },
+    { key: "매출2", title: "매출2", note: "검색팀 매출군 (파워컨텐츠 · 구글 · 메타 등)", titleText: "* 매출2", labelCol: 15, colStart: 16 },
+    { key: "정산1", title: "정산1", note: "페이백 · 대대행사 지출 반영 후 정산 잔액", titleText: "* 정산1", labelCol: 2, colStart: 3 },
+    { key: "정산2", title: "정산2", note: "페이백 · 대대행사 지출 반영 후 정산 잔액", titleText: "* 정산2", labelCol: 15, colStart: 16 },
+    { key: "대대행", title: "대대행 정산 상세", note: "채널별 네이버CPC · 카카오CPC · 카카오모먼트", titleText: "* 대대행 정산 상세", labelCol: 2, colStart: 3, opts: { hideEmptyRows: true } },
+    { key: "페이백", title: "페이백상세", note: "업체별 매출합계 · 지급금액", titleText: "* 페이백 상세", labelCol: 2, colStart: 3 },
+    { key: "요율상이", title: "요율 상이 상세", note: "업로드 화면에서 직접 입력한 예외 거래처", titleText: "* 요율 상이 상세", labelCol: 15, colStart: 16 },
+  ];
+
+  // 총합 뱃지를 보여줄 표들 (매출1/2, 정산1/2 - 각각 제목 행, 마지막 항목 열에 실제 SUM 수식이 있음)
+  const GRAND_TOTAL_SECTIONS = new Set(["매출1", "매출2", "정산1", "정산2"]);
+
+  // 표의 실제 엑셀 파일에 이미 있는 '총합' 셀(제목 행, 항목 마지막 열)에서 총합계 값을 그대로 읽어온다.
+  // (예: 매출1의 경우 '카울리' 바로 위, L5 = SUM(C10:L10))
+  function getSectionGrandTotal(ws, evaluator, section, titleText) {
+    if (!section || !section.cols.length) return null;
+    const dims = sheetDims(ws);
+    const title = findRowByCellValue(ws, titleText, dims.rows, dims.cols);
+    if (!title) return null;
+    const lastCol = section.cols[section.cols.length - 1].col;
+    const { value } = readCellAny(ws, evaluator, title.row, lastCol);
+    return typeof value === "number" ? value : null;
+  }
+
+  // ws/evaluator로부터 대시보드 전체를 "저장 가능한 순수 데이터"로 만든다.
+  function buildDashboardModel(ws, evaluator, filledSet) {
+    const 매출합계행 = findRowByLabelFuzzy(ws, "매출 합계", 2);
+    const 정산합계행 = findRowByLabelFuzzy(ws, "정산 합계", 2);
+    const kpi = [
+      ["매출 합계", 매출합계행 ? readCellAny(ws, evaluator, 매출합계행, 3).value : null],
+      ["페이백 제외 매출", 매출합계행 ? readCellAny(ws, evaluator, 매출합계행, 5).value : null],
+      ["정산 합계", 정산합계행 ? readCellAny(ws, evaluator, 정산합계행, 3).value : null],
+    ];
+
+    const sections = DASHBOARD_SECTIONS.map((def) => {
+      const section = extractSection(ws, def.titleText, def.labelCol, def.colStart);
+      const model = computeSectionModel(ws, evaluator, filledSet, section, def.opts);
+      const grandTotal = GRAND_TOTAL_SECTIONS.has(def.key) ? getSectionGrandTotal(ws, evaluator, section, def.titleText) : null;
+      return { key: def.key, title: def.title, note: def.note, model, grandTotal };
+    });
+
+    return { kpi, sections, savedAt: Date.now() };
+  }
+
+  // 데이터 모델(방금 계산한 것이든, 저장소에서 불러온 것이든) -> 화면 HTML
+  function renderDashboardModel(dashModel) {
+    let html = '<div class="dash-kpi-row">';
+    for (const [label, val] of dashModel.kpi) {
+      html += `<div class="dash-kpi"><span class="dash-kpi-label">${label}</span>` +
+        `<span class="dash-kpi-value">${typeof val === "number" ? Math.round(val).toLocaleString("ko-KR") : "–"}</span></div>`;
+    }
+    html += "</div>";
+
+    html += `<div class="dash-legend">
+      <span class="dash-legend-item"><span class="dash-swatch"></span>이번에 새로 채운 값</span>
+      <span class="dash-legend-item"><span class="dash-swatch-formula"></span>템플릿 수식으로 자동 계산된 값</span>
+      <span class="dash-legend-item"><span class="dash-swatch-edited"></span>직접 수정한 값</span>
+      <span class="dash-legend-item"><span class="dash-swatch-prevmonth"></span>저장된 전월 데이터에서 가져온 값</span>
+    </div>
+    <div class="dash-edit-hint">숫자 셀을 클릭하면 직접 수정할 수 있습니다</div>`;
+
+    for (const sec of dashModel.sections) {
+      const totalBadge = (sec.grandTotal !== null && sec.grandTotal !== undefined)
+        ? `<span class="dash-section-total">총합계 ${Math.round(sec.grandTotal).toLocaleString("ko-KR")}</span>`
+        : "";
+      html += `<div class="dash-section"><div class="dash-section-title">${sec.title} <span class="dash-section-note">${sec.note}</span>${totalBadge}</div>`;
+      html += renderSectionModel(sec.model, sec.key);
+      html += "</div>";
+    }
+    return html;
+  }
+
+  function buildDashboardHTML(ws, evaluator, filledSet) {
+    return renderDashboardModel(buildDashboardModel(ws, evaluator, filledSet));
+  }
+
+  function findRowByLabelFuzzy(ws, label, col) {
+    const dims = sheetDims(ws);
+    for (let r = 1; r <= dims.rows; r++) {
+      const v = cellVal(ws, r, col);
+      if (v !== null && String(v).trim() === label) return r;
+    }
+    return null;
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll(".st-tab").forEach((btn) => {
+      btn.classList.toggle("st-tab-active", btn.dataset.tab === name);
+    });
+    document.querySelectorAll(".st-tabpanel").forEach((panel) => {
+      panel.classList.toggle("st-tabpanel-active", panel.id === "tabpanel-" + name);
+    });
+  }
+  document.querySelectorAll(".st-tab").forEach((btn) => {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  });
+  document.getElementById("goUploadBtn").addEventListener("click", () => switchTab("upload"));
+
+  // 현재 화면에 보이는 대시보드의 상태 (라이브로 계산한 것인지, 저장소에서 불러온 것인지)
+  let activeModel = null;
+  let activeMode = "none";       // "live" | "history" | "none"
+  let currentWsOut = null;       // 라이브일 때만: 실제 엑셀 워크시트 (수정 시 같이 갱신)
+  let currentWbOut = null;       // 라이브일 때만: 다운로드용 워크북
+  let activeHistoryKey = null;   // 히스토리 모드일 때: 불러온 저장 키
+
+  function regenerateDownloadLink() {
+    if (activeMode !== "live" || !currentWbOut) return;
+    const arrbuf = XLSX.write(currentWbOut, { type: "array", bookType: "xlsx", cellStyles: true });
+    const blob = new Blob([arrbuf], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const link = document.getElementById("downloadLink");
+    link.href = url;
+  }
+
+  async function renderResults(result) {
+    document.getElementById("dashEmpty").style.display = "none";
+    document.getElementById("results").classList.add("st-show");
+
+    const monthGuess = state.검색팀시트 || "";
+    document.getElementById("stampMonth").textContent = monthGuess + " 정산";
+    document.getElementById("stampSub").textContent = "매출 정산 내용을 확인하세요";
+
+    const { wb: wbOut, ws: wsOut, filledSet } = fillTemplate(state.기입템플릿, state.기입시트, result);
+    const evaluator = FormulaEval.createSheetEvaluator(wsOut);
+
+    activeMode = "live";
+    activeHistoryKey = null;
+    currentWsOut = wsOut;
+    currentWbOut = wbOut;
+    activeModel = buildDashboardModel(wsOut, evaluator, filledSet);
+
+    // 저장해둔 직전 달 데이터가 있으면 '전월 매출' 행을 자동으로 채운다
+    const { applied, prevPeriod } = await applyPrevMonthSales(activeModel, wsOut);
+    if (applied) {
+      document.getElementById("stampSub").textContent = `매출 정산 내용을 확인하세요 · 전월 매출은 저장된 ${prevPeriod} 데이터에서 자동으로 가져왔습니다`;
+    } else if (prevPeriod) {
+      document.getElementById("stampSub").textContent =
+        `매출 정산 내용을 확인하세요 · 저장된 ${prevPeriod} 데이터가 없어 전월 매출은 템플릿 값을 그대로 사용합니다`;
+    }
+
+    document.getElementById("dashboardContent").innerHTML = renderDashboardModel(activeModel);
+
+    const link = document.getElementById("downloadLink");
+    link.download = (fileNames["기입템플릿"] || "매출기입").replace(/\.xlsx$/i, "") + "_최종.xlsx";
+    link.style.display = "";
+    regenerateDownloadLink();
+
+    document.getElementById("saveMonthInput").disabled = false;
+    document.getElementById("saveMonthBtn").disabled = false;
+    document.getElementById("saveMonthBtn").textContent = "이번 달 대시보드 저장";
+    document.getElementById("saveMonthMsg").textContent = "";
+    // 저장 이름은 항상 대시보드 제목의 당월(monthGuess)을 그대로 따라가도록 매번 갱신
+    document.getElementById("saveMonthInput").value = monthGuess || "";
+
+    const stamp = document.getElementById("stamp");
+    stamp.classList.remove("st-in");
+    requestAnimationFrame(() => requestAnimationFrame(() => stamp.classList.add("st-in")));
+
+    switchTab("dashboard");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ---------------------------------------------------------------------
+  // 셀 직접 수정 (클릭 -> 입력칸으로 전환 -> Enter/포커스 아웃으로 저장)
+  // ---------------------------------------------------------------------
+
+  function startEditCell(td) {
+    if (td.querySelector("input")) return; // 이미 편집 중
+    const original = td.textContent;
+    const raw = td.dataset.raw;
+    const isPercent = td.dataset.percent === "1";
+
+    let editValue;
+    if (raw !== "" && raw !== undefined) {
+      editValue = isPercent ? String(Math.round(parseFloat(raw) * 100)) : raw;
+    } else {
+      editValue = original === "–" ? "" : original.replace(/,/g, "").replace("%", "");
+    }
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "dash-edit-input";
+    input.value = editValue;
+    td.textContent = "";
+    td.appendChild(input);
+    input.focus();
+    input.select();
+
+    let committed = false;
+    function commit() {
+      if (committed) return;
+      committed = true;
+      finishEditCell(td, input.value.trim(), original);
+    }
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+      else if (ev.key === "Escape") { committed = true; td.textContent = original; }
+    });
+    input.addEventListener("blur", commit);
+  }
+
+  function finishEditCell(td, newValStr, originalText) {
+    const secKey = td.dataset.sec;
+    const rowIdx = parseInt(td.dataset.row, 10);
+    const cellIdx = parseInt(td.dataset.cell, 10);
+    const addr = td.dataset.addr;
+    const isPercent = td.dataset.percent === "1";
+
+    if (newValStr === "") {
+      td.textContent = originalText;
+      return;
+    }
+
+    const num = parseFloat(newValStr.replace(/,/g, ""));
+    if (isNaN(num)) {
+      td.textContent = originalText;
+      return;
+    }
+
+    const raw = isPercent ? num / 100 : num;
+    const text = isPercent ? Math.round(num) + "%" : Math.round(num).toLocaleString("ko-KR");
+
+    // 모델(저장/다시렌더링에 쓰이는 데이터) 갱신
+    if (activeModel) {
+      const sec = activeModel.sections.find((s) => s.key === secKey);
+      if (sec && sec.model && sec.model.rows[rowIdx] && sec.model.rows[rowIdx].cells[cellIdx]) {
+        const cell = sec.model.rows[rowIdx].cells[cellIdx];
+        cell.text = text; cell.raw = raw; cell.cls = "dash-edited";
+      }
+    }
+
+    td.className = "dash-edited";
+    td.textContent = text;
+    td.dataset.raw = raw;
+
+    // 라이브 모드면 실제 워크시트에도 반영 -> 다운로드 파일에도 그대로 들어감
+    if (activeMode === "live" && addr && currentWsOut) {
+      currentWsOut[addr] = { t: "n", v: raw };
+      regenerateDownloadLink();
+    }
+  }
+
+  document.getElementById("dashboardContent").addEventListener("click", (e) => {
+    const td = e.target.closest('td[data-editable="1"]');
+    if (!td) return;
+    startEditCell(td);
+  });
+
+  // ---------------------------------------------------------------------
+  // 월별 대시보드 저장/불러오기 (window.storage)
+  // ---------------------------------------------------------------------
+
+  const HISTORY_PREFIX = "dashboard:";
+
+  // "26.07" -> "26.06" (1월이면 전년도 12월로) : 저장 키가 이 형식(검색팀 시트명)을 따른다고 가정
+  function computePreviousPeriod(periodStr) {
+    const m = String(periodStr || "").match(/^(\d{2,4})\.(\d{1,2})$/);
+    if (!m) return null;
+    let yy = parseInt(m[1], 10);
+    let mm = parseInt(m[2], 10) - 1;
+    if (mm < 1) { mm = 12; yy -= 1; }
+    return String(yy).padStart(m[1].length, "0") + "." + String(mm).padStart(2, "0");
+  }
+
+  // 매출1/매출2의 '전월 매출' 행을, 저장해둔 직전 달 데이터의 '합산 매출' 행 값으로 채운다.
+  // (저장 이름을 기본값 그대로 뒀을 때의 'YY.MM' 형식 키를 기준으로 직전 달을 찾는다)
+  async function applyPrevMonthSales(dashModel, wsOut) {
+    const currentPeriod = state.검색팀시트;
+    const prevPeriod = computePreviousPeriod(currentPeriod);
+    if (!prevPeriod || !window.storage) return { applied: false, prevPeriod };
+
+    let prevModel = null;
+    try {
+      const res = await window.storage.get(HISTORY_PREFIX + prevPeriod, false);
+      if (res) prevModel = JSON.parse(res.value);
+    } catch (e) { /* 저장된 직전 달 데이터가 없으면 그냥 넘어감 */ }
+    if (!prevModel) return { applied: false, prevPeriod };
+
+    let appliedAny = false;
+    for (const key of ["매출1", "매출2"]) {
+      const curSec = dashModel.sections.find((s) => s.key === key);
+      const prevSec = prevModel.sections.find((s) => s.key === key);
+      if (!curSec || !curSec.model || !prevSec || !prevSec.model) continue;
+
+      const prevTotalRow = prevSec.model.rows.find((r) => /^합산\s*매출$/.test(r.label.trim()));
+      const curPrevRow = curSec.model.rows.find((r) => r.label.trim() === "전월 매출");
+      if (!prevTotalRow || !curPrevRow) continue;
+
+      // 열 순서가 다를 수 있으니 열 '이름'으로 매칭
+      const prevColIndex = {};
+      prevSec.model.colLabels.forEach((label, i) => { prevColIndex[label] = i; });
+
+      curSec.model.colLabels.forEach((label, i) => {
+        const pIdx = prevColIndex[label];
+        if (pIdx === undefined) return;
+        const prevCell = prevTotalRow.cells[pIdx];
+        if (!prevCell) return;
+        const curCell = curPrevRow.cells[i];
+        curCell.text = prevCell.text;
+        curCell.raw = prevCell.raw;
+        curCell.cls = "dash-prevmonth";
+        appliedAny = true;
+
+        if (wsOut && curCell.addr) {
+          if (prevCell.raw === null || prevCell.raw === undefined) delete wsOut[curCell.addr];
+          else wsOut[curCell.addr] = { t: "n", v: prevCell.raw };
+        }
+      });
+    }
+    return { applied: appliedAny, prevPeriod };
+  }
+
+
+  async function refreshHistoryList(selectValue) {
+    const sel = document.getElementById("historySelect");
+    sel.innerHTML = '<option value="">불러올 월 선택...</option>';
+    try {
+      const result = await window.storage.list(HISTORY_PREFIX, false);
+      const keys = (result && result.keys) || [];
+      keys.sort().reverse().forEach((k) => {
+        const label = k.slice(HISTORY_PREFIX.length);
+        const opt = document.createElement("option");
+        opt.value = k; opt.textContent = label;
+        sel.appendChild(opt);
+      });
+      if (selectValue) sel.value = selectValue;
+    } catch (e) {
+      console.error("저장된 월 목록을 불러오지 못했습니다", e);
+    }
+  }
+
+  document.getElementById("saveMonthBtn").addEventListener("click", async () => {
+    const nameInput = document.getElementById("saveMonthInput");
+    const msg = document.getElementById("saveMonthMsg");
+    const name = nameInput.value.trim();
+    if (!name) { msg.style.color = "var(--stamp)"; msg.textContent = "저장할 이름을 입력하세요"; return; }
+    if (!activeModel) { msg.style.color = "var(--stamp)"; msg.textContent = "먼저 정리를 실행하거나 저장된 월을 불러오세요"; return; }
+    try {
+      const key = HISTORY_PREFIX + name;
+
+      // 같은 이름이 이미 저장되어 있으면 덮어쓸지 확인
+      const existing = await window.storage.get(key, false).catch(() => null);
+      if (existing && key !== activeHistoryKey) {
+        const overwrite = await customConfirm(`"${name}" 이름으로 이미 저장된 데이터가 있습니다.\n덮어쓰시겠습니까?`);
+        if (!overwrite) {
+          msg.style.color = "var(--warn)";
+          msg.textContent = "저장을 취소했습니다";
+          return;
+        }
+      }
+
+      const saved = await window.storage.set(key, JSON.stringify(activeModel), false);
+      if (!saved) throw new Error("저장 실패");
+      msg.style.color = "var(--ok)";
+      msg.textContent = `"${name}" 이름으로 저장했습니다`;
+      activeHistoryKey = key;
+      await refreshHistoryList(key);
+    } catch (e) {
+      msg.style.color = "var(--stamp)";
+      msg.textContent = "저장 중 오류가 발생했습니다: " + e.message;
+    }
+  });
+
+  document.getElementById("historyLoadBtn").addEventListener("click", async () => {
+    const sel = document.getElementById("historySelect");
+    const key = sel.value;
+    if (!key) return;
+    try {
+      const result = await window.storage.get(key, false);
+      if (!result) { showGlobalError("저장된 데이터를 찾을 수 없습니다."); return; }
+      const model = JSON.parse(result.value);
+
+      activeMode = "history";
+      activeHistoryKey = key;
+      currentWsOut = null;
+      currentWbOut = null;
+      activeModel = model;
+
+      document.getElementById("dashEmpty").style.display = "none";
+      document.getElementById("results").classList.add("st-show");
+      document.getElementById("stampMonth").textContent = key.slice(HISTORY_PREFIX.length) + " 정산";
+      document.getElementById("stampSub").textContent =
+        "저장된 데이터를 불러왔습니다" + (model.savedAt ? " · " + new Date(model.savedAt).toLocaleString("ko-KR") : "");
+      document.getElementById("dashboardContent").innerHTML = renderDashboardModel(activeModel);
+
+      // 저장된 스냅샷은 원본 엑셀 파일이 없으므로 다운로드는 비활성화하지만,
+      // 수정 후 같은 이름으로 다시 저장하는 것은 가능하게 둔다.
+      const link = document.getElementById("downloadLink");
+      link.removeAttribute("href");
+      link.style.display = "none";
+      document.getElementById("saveMonthInput").disabled = false;
+      document.getElementById("saveMonthInput").value = key.slice(HISTORY_PREFIX.length);
+      document.getElementById("saveMonthBtn").disabled = false;
+      document.getElementById("saveMonthBtn").textContent = "수정 내용 다시 저장";
+      document.getElementById("saveMonthMsg").textContent = "";
+
+      switchTab("dashboard");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      showGlobalError("불러오는 중 오류가 발생했습니다: " + e.message);
+    }
+  });
+
+  document.getElementById("historyDeleteBtn").addEventListener("click", async () => {
+    const sel = document.getElementById("historySelect");
+    const key = sel.value;
+    if (!key) return;
+    if (!(await customConfirm(`"${key.slice(HISTORY_PREFIX.length)}" 저장 데이터를 삭제할까요?`))) return;
+    try {
+      await window.storage.delete(key, false);
+      await refreshHistoryList();
+    } catch (e) {
+      showGlobalError("삭제 중 오류가 발생했습니다: " + e.message);
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // 매출기입 템플릿 고정해두기 (매달 동일한 템플릿이면 재업로드 없이 자동 사용)
+  // ---------------------------------------------------------------------
+
+  const FIXED_TEMPLATE_KEY = "fixedFillTemplate";
+
+  function arrayBufferToBase64(buf) {
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+  function base64ToArrayBuffer(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  async function saveFixedTemplate(arrayBuffer, filename) {
+    try {
+      const payload = JSON.stringify({ filename, base64: arrayBufferToBase64(arrayBuffer) });
+      await window.storage.set(FIXED_TEMPLATE_KEY, payload, false);
+      return true;
+    } catch (e) {
+      showGlobalError("템플릿을 고정 저장하는 중 오류가 발생했습니다: " + e.message);
+      return false;
+    }
+  }
+
+  async function loadFixedTemplate() {
+    try {
+      const res = await window.storage.get(FIXED_TEMPLATE_KEY, false);
+      if (!res) return null;
+      const parsed = JSON.parse(res.value);
+      return { filename: parsed.filename, buffer: base64ToArrayBuffer(parsed.base64) };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function clearFixedTemplate() {
+    try { await window.storage.delete(FIXED_TEMPLATE_KEY, false); } catch (e) {}
+  }
+
+  function applyFillTemplateWorkbook(wb, filename) {
+    state.기입템플릿 = wb;
+    fileNames["기입템플릿"] = filename;
+    setStepFile("기입템플릿", filename, null);
+
+    const sel = document.getElementById("fillSheetSelect");
+    if (wb.SheetNames.length > 1) {
+      sel.innerHTML = "";
+      wb.SheetNames.forEach((name) => {
+        const opt = document.createElement("option");
+        opt.value = name; opt.textContent = name;
+        sel.appendChild(opt);
+      });
+      sel.style.display = "inline-block";
+      let defaultSheet = wb.SheetNames[0];
+      if (state.검색팀시트) {
+        const monthNum = extractMonthFromYYMM(state.검색팀시트);
+        const matched = findSheetContainingMonthWord(wb.SheetNames, monthNum);
+        if (matched) defaultSheet = matched;
+      }
+      state.기입시트 = defaultSheet;
+      sel.value = defaultSheet;
+      sel.onchange = () => { state.기입시트 = sel.value; syncSearchSheetToFillMonth(); updateRunButton(); refreshRateExceptionInputs(); };
+    } else {
+      sel.style.display = "none";
+      state.기입시트 = wb.SheetNames[0];
+    }
+    syncSearchSheetToFillMonth();
+    refreshRateExceptionInputs();
+    updateRunButton();
+  }
+
+  document.getElementById("fixTemplateCheckbox").addEventListener("change", async (e) => {
+    const statusEl = document.getElementById("fixedTemplateStatus");
+    if (e.target.checked) {
+      if (!state.기입템플릿) {
+        showGlobalError("먼저 매출기입 템플릿 파일을 선택해주세요.");
+        e.target.checked = false;
+        return;
+      }
+      const arrbuf = XLSX.write(state.기입템플릿, { type: "array", bookType: "xlsx" });
+      const ok = await saveFixedTemplate(arrbuf, fileNames["기입템플릿"] || "매출기입템플릿.xlsx");
+      if (ok) {
+        statusEl.style.display = "block";
+        statusEl.textContent = `"${fileNames["기입템플릿"]}"을 고정해뒀습니다. 다음부터는 자동으로 불러옵니다.`;
+      }
+    } else {
+      await clearFixedTemplate();
+      statusEl.style.display = "block";
+      statusEl.textContent = "고정을 해제했습니다. 다음부터는 다시 직접 올려야 합니다.";
+    }
+  });
+
+  async function tryAutoLoadFixedTemplate() {
+    const fixed = await loadFixedTemplate();
+    if (!fixed) return;
+    try {
+      const wb = XLSX.read(fixed.buffer, { type: "array", cellStyles: true });
+      applyFillTemplateWorkbook(wb, fixed.filename);
+      document.getElementById("fixTemplateCheckbox").checked = true;
+      const statusEl = document.getElementById("fixedTemplateStatus");
+      statusEl.style.display = "block";
+      statusEl.textContent = `고정된 템플릿 "${fixed.filename}"을 자동으로 불러왔습니다. 바꾸려면 새 파일을 다시 올려주세요.`;
+    } catch (e) {
+      // 고정 저장된 템플릿을 못 읽으면 조용히 무시 (사용자가 직접 올리면 됨)
+    }
+  }
+
+  refreshHistoryList();
+  tryAutoLoadFixedTemplate();
+})();
+</script>
