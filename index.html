@@ -352,6 +352,7 @@
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", function () {
 (function () {
   // 비밀번호를 코드에 그대로 적지 않고 해시(SHA-256)로만 저장해서 비교합니다.
   // 비밀번호를 바꾸려면: 브라우저 콘솔에서 아래처럼 새 해시를 만들어서 PASSWORD_HASH 값만 바꾸면 됩니다.
@@ -367,8 +368,10 @@
   }
 
   function unlock() {
-    document.getElementById("loginOverlay").style.display = "none";
-    document.getElementById("stRoot").style.display = "";
+    var overlay = document.getElementById("loginOverlay");
+    var root = document.getElementById("stRoot");
+    if (overlay) overlay.style.display = "none";
+    if (root) root.style.display = "";
   }
 
   if (localStorage.getItem(REMEMBER_KEY) === "1") {
@@ -378,6 +381,7 @@
     var btn = document.getElementById("loginSubmitBtn");
     var err = document.getElementById("loginError");
     var remember = document.getElementById("loginRememberCheckbox");
+    if (!input || !btn || !err || !remember) return; // 화면 요소가 없으면 조용히 건너뜀
 
     async function trySubmit() {
       var hash = await sha256(input.value);
@@ -395,6 +399,7 @@
     input.focus();
   }
 })();
+});
 </script>
 
 <div class="st-root" id="stRoot" style="display:none;">
@@ -2444,6 +2449,13 @@
     const configInput = document.getElementById("firebaseConfigInput");
     const status = document.getElementById("firebaseStatus");
 
+    // 필요한 요소 중 하나라도 없으면(예: 캐시된 옛 버전의 화면이 섞여 있는 경우)
+    // 조용히 건너뛰어서 나머지 기능(파일 업로드 등)까지 같이 멈추지 않게 한다.
+    if (!btn || !panel || !fields || !configInput || !status) {
+      console.warn("저장소 설정 UI 요소를 일부 찾지 못해 이 기능은 건너뜁니다. (페이지 새로고침 후에도 계속되면 파일을 다시 올려주세요)");
+      return;
+    }
+
     btn.addEventListener("click", () => {
       panel.style.display = panel.style.display === "none" ? "block" : "none";
     });
@@ -2495,7 +2507,7 @@
       }
     });
   }
-  initStorageSettingsUI();
+  try { initStorageSettingsUI(); } catch (e) { console.error("저장소 설정 UI 초기화 실패:", e); }
 
   // "26.07" -> "26.06" (1월이면 전년도 12월로) : 저장 키가 이 형식(검색팀 시트명)을 따른다고 가정
   function computePreviousPeriod(periodStr) {
@@ -2775,7 +2787,7 @@
     }
   }
 
-  refreshHistoryList();
-  tryAutoLoadFixedTemplate();
+  try { refreshHistoryList(); } catch (e) { console.error("저장된 월 목록 초기화 실패:", e); }
+  try { tryAutoLoadFixedTemplate(); } catch (e) { console.error("고정 템플릿 자동 불러오기 실패:", e); }
 })();
 </script>
