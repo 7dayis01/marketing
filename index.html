@@ -436,9 +436,9 @@ document.addEventListener("DOMContentLoaded", function () {
       </div>
 
       <div class="dash-storage-settings" id="storageSettingsPanel" style="display:none;">
-        <div class="dash-storage-settings-title">저장소 설정 <span class="dash-manual-note">— 기본은 이 브라우저에만 저장됩니다. 여러 사람이 같은 데이터를 보려면 Firebase 연동을 켜세요.</span></div>
-        <label class="dash-storage-radio"><input type="radio" name="storageMode" value="local" checked> 이 브라우저에만 저장 (기본)</label>
-        <label class="dash-storage-radio"><input type="radio" name="storageMode" value="firebase"> Firebase에 저장 (여러 사람과 공유 가능)</label>
+        <div class="dash-storage-settings-title">저장소 설정 <span class="dash-manual-note">— 기본으로 팀 공유 Firebase 저장소를 사용합니다. 이 브라우저에서만 따로 쓰고 싶으면 위에서 바꾸세요.</span></div>
+        <label class="dash-storage-radio"><input type="radio" name="storageMode" value="local"> 이 브라우저에만 저장</label>
+        <label class="dash-storage-radio"><input type="radio" name="storageMode" value="firebase" checked> Firebase 공유 저장소 사용 (기본값)</label>
         <div id="firebaseConfigFields" style="display:none;">
           <div class="dash-manual-help" style="margin-bottom:8px;">
             <a href="https://console.firebase.google.com" target="_blank" rel="noopener">Firebase 콘솔</a>에서 프로젝트 생성 → Firestore Database 사용 설정(테스트 모드) → 웹 앱 등록 후 나오는
@@ -564,17 +564,32 @@ document.addEventListener("DOMContentLoaded", function () {
   const FIREBASE_CONFIG_KEY = "settlement_tool_firebase_config";
   const FIRESTORE_COLLECTION = "settlement_storage";
 
+  // 팀 공용 Firebase 프로젝트 (기본값) - 별도 설정 없이도 누구나 접속하면 자동으로 이 저장소를 씁니다.
+  // 다른 프로젝트로 바꾸고 싶으면 "⚙ 저장소" 화면에서 새 설정값을 붙여넣으면 그걸 우선 사용합니다.
+  const DEFAULT_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCxBdrt-LciadXrkG4Xx9wzEMgmnNh8zgo",
+    authDomain: "dayis-marketing.firebaseapp.com",
+    projectId: "dayis-marketing",
+    storageBucket: "dayis-marketing.firebasestorage.app",
+    messagingSenderId: "415121284877",
+    appId: "1:415121284877:web:5e726f3421ad8052cc1a44",
+  };
+
   function getFirebaseConfig() {
     try {
       const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
-      const cfg = raw ? JSON.parse(raw) : null;
-      return (cfg && cfg.mode === "firebase" && cfg.config && cfg.config.projectId) ? cfg.config : null;
-    } catch (e) { return null; }
+      if (raw === null) return DEFAULT_FIREBASE_CONFIG; // 아직 아무 선택도 안 했으면 기본 공유 저장소 사용
+      const cfg = JSON.parse(raw);
+      if (cfg && cfg.mode === "local") return null; // 이 브라우저만 로컬로 쓰겠다고 명시적으로 선택함
+      if (cfg && cfg.mode === "firebase" && cfg.config && cfg.config.projectId) return cfg.config;
+      return DEFAULT_FIREBASE_CONFIG;
+    } catch (e) { return DEFAULT_FIREBASE_CONFIG; }
   }
   window.__getFirebaseConfig = getFirebaseConfig;
+  window.__getDefaultFirebaseConfig = function () { return DEFAULT_FIREBASE_CONFIG; };
   window.__setFirebaseConfig = function (config) {
     try {
-      if (config === null) { localStorage.removeItem(FIREBASE_CONFIG_KEY); return; }
+      if (config === null) { localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify({ mode: "local" })); return; }
       localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify({ mode: "firebase", config }));
     } catch (e) {}
   };
@@ -2461,12 +2476,16 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     const cfg = window.__getFirebaseConfig ? window.__getFirebaseConfig() : null;
+    const defaultCfg = window.__getDefaultFirebaseConfig ? window.__getDefaultFirebaseConfig() : null;
     if (cfg) {
       document.querySelector('input[name="storageMode"][value="firebase"]').checked = true;
       fields.style.display = "block";
       configInput.value = JSON.stringify(cfg, null, 2);
       status.style.color = "var(--ok)";
-      status.textContent = "Firebase 저장소가 설정되어 있습니다. (프로젝트: " + cfg.projectId + ")";
+      const isDefault = defaultCfg && cfg.projectId === defaultCfg.projectId;
+      status.textContent = isDefault
+        ? `기본 공유 저장소를 사용 중입니다. (프로젝트: ${cfg.projectId}) — 별도 설정 없이도 팀 전체가 같은 데이터를 봅니다.`
+        : `Firebase 저장소가 설정되어 있습니다. (프로젝트: ${cfg.projectId})`;
     }
 
     radios.forEach((r) => {
