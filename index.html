@@ -298,9 +298,106 @@
   table.dash-manual-table td.dash-manual-hint { background: #fff6dd; }
   table.dash-manual-table td.dash-manual-hint input { border-color: #e3c565; background: #fffdf5; }
   .dash-manual-legend-hint { background: #fff6dd; border: 1px solid #e3c565; border-radius: 2px; padding: 0 4px; }
+
+  .dash-storage-settings {
+    background: var(--panel); border: 1px solid var(--paper-line); border-radius: 3px;
+    padding: 14px 16px; margin-bottom: 16px; font-size: 12px;
+  }
+  .dash-storage-settings-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+  .dash-storage-radio { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; cursor: pointer; }
+  .dash-storage-input {
+    width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; font-size: 12px;
+    border: 1px solid var(--paper-line); border-radius: 3px; font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  }
+  .dash-storage-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+  .dash-storage-status { font-size: 11px; font-weight: 600; }
+  .dash-manual-textarea {
+    width: 100%; min-height: 80px; box-sizing: border-box; padding: 10px 12px; font-size: 12px;
+    font-family: "SFMono-Regular", Consolas, Menlo, monospace; border: 1px solid var(--paper-line);
+    border-radius: 3px; resize: vertical; margin-bottom: 8px;
+  }
+
+  .login-overlay {
+    position: fixed; inset: 0; background: #1e2a2f; z-index: 5000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-box {
+    background: #fff; border-radius: 6px; padding: 36px 32px; width: 90%; max-width: 320px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center;
+  }
+  .login-box h2 { font-size: 18px; margin: 0 0 6px; color: #1e2a2f; }
+  .login-box p { font-size: 12px; color: #8a948c; margin: 0 0 20px; }
+  .login-box input[type="password"] {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 14px;
+    border: 1px solid #d8dbcf; border-radius: 3px; margin-bottom: 10px; text-align: center;
+  }
+  .login-box button {
+    width: 100%; padding: 11px; font-size: 14px; font-weight: 700; background: #1e2a2f; color: #fff;
+    border: none; border-radius: 3px; cursor: pointer;
+  }
+  .login-box button:hover { opacity: 0.9; }
+  .login-remember { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0; font-size: 12px; color: #6b7a72; }
+  .login-error { color: #a8412c; font-size: 12px; margin-top: 8px; min-height: 16px; }
 </style>
 
-<div class="st-root">
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>매출 정산 자동화</h2>
+    <p>관리자 비밀번호를 입력하세요</p>
+    <input type="password" id="loginPasswordInput" placeholder="비밀번호" autocomplete="off">
+    <label class="login-remember"><input type="checkbox" id="loginRememberCheckbox" checked> 이 브라우저에서 기억하기</label>
+    <button id="loginSubmitBtn">확인</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // 비밀번호를 코드에 그대로 적지 않고 해시(SHA-256)로만 저장해서 비교합니다.
+  // 비밀번호를 바꾸려면: 브라우저 콘솔에서 아래처럼 새 해시를 만들어서 PASSWORD_HASH 값만 바꾸면 됩니다.
+  //   crypto.subtle.digest("SHA-256", new TextEncoder().encode("새비밀번호"))
+  //     .then(b => console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")))
+  // 기본 비밀번호: 00!@
+  var PASSWORD_HASH = "07a411a3c3f9b2084109d981130464ec87175db3284439439c896c02f0be2783";
+  var REMEMBER_KEY = "settlement_tool_authed";
+
+  async function sha256(text) {
+    var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+  }
+
+  function unlock() {
+    document.getElementById("loginOverlay").style.display = "none";
+    document.getElementById("stRoot").style.display = "";
+  }
+
+  if (localStorage.getItem(REMEMBER_KEY) === "1") {
+    unlock();
+  } else {
+    var input = document.getElementById("loginPasswordInput");
+    var btn = document.getElementById("loginSubmitBtn");
+    var err = document.getElementById("loginError");
+    var remember = document.getElementById("loginRememberCheckbox");
+
+    async function trySubmit() {
+      var hash = await sha256(input.value);
+      if (hash === PASSWORD_HASH) {
+        if (remember.checked) localStorage.setItem(REMEMBER_KEY, "1");
+        unlock();
+      } else {
+        err.textContent = "비밀번호가 올바르지 않습니다.";
+        input.value = "";
+        input.focus();
+      }
+    }
+    btn.addEventListener("click", trySubmit);
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") trySubmit(); });
+    input.focus();
+  }
+})();
+</script>
+
+<div class="st-root" id="stRoot" style="display:none;">
   <div class="st-shell">
     <div class="st-masthead">
       <h1>매출 정산 자동화</h1>
@@ -330,6 +427,33 @@
         <select class="st-sheetselect" id="historySelect"><option value="">불러올 월 선택...</option></select>
         <button class="dash-history-btn" id="historyLoadBtn">불러오기</button>
         <button class="dash-history-btn dash-history-btn-danger" id="historyDeleteBtn">삭제</button>
+        <button class="dash-history-btn" id="storageSettingsBtn" title="저장소 설정">⚙ 저장소</button>
+      </div>
+
+      <div class="dash-storage-settings" id="storageSettingsPanel" style="display:none;">
+        <div class="dash-storage-settings-title">저장소 설정 <span class="dash-manual-note">— 기본은 이 브라우저에만 저장됩니다. 여러 사람이 같은 데이터를 보려면 Firebase 연동을 켜세요.</span></div>
+        <label class="dash-storage-radio"><input type="radio" name="storageMode" value="local" checked> 이 브라우저에만 저장 (기본)</label>
+        <label class="dash-storage-radio"><input type="radio" name="storageMode" value="firebase"> Firebase에 저장 (여러 사람과 공유 가능)</label>
+        <div id="firebaseConfigFields" style="display:none;">
+          <div class="dash-manual-help" style="margin-bottom:8px;">
+            <a href="https://console.firebase.google.com" target="_blank" rel="noopener">Firebase 콘솔</a>에서 프로젝트 생성 → Firestore Database 사용 설정(테스트 모드) → 웹 앱 등록 후 나오는
+            <b>firebaseConfig 설정값</b>을 아래에 그대로 붙여넣으세요 (중괄호 { } 포함해서 통째로).
+          </div>
+          <textarea id="firebaseConfigInput" class="dash-manual-textarea" style="min-height:110px;"
+            placeholder='{
+  apiKey: "AIza...",
+  authDomain: "내프로젝트.firebaseapp.com",
+  projectId: "내프로젝트",
+  storageBucket: "내프로젝트.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef"
+}'></textarea>
+          <div class="dash-storage-actions">
+            <button class="dash-history-btn" id="firebaseTestBtn">연결 테스트</button>
+            <button class="dash-history-btn dash-history-btn-primary" id="firebaseSaveBtn">저장</button>
+          </div>
+          <div class="dash-storage-status" id="firebaseStatus"></div>
+        </div>
       </div>
 
       <div class="dash-empty" id="dashEmpty">
@@ -430,49 +554,148 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
-// Claude 아티팩트 밖(일반 웹 호스팅)에서 열었을 때를 위한 폴백:
-// window.storage가 없으면 브라우저의 localStorage로 동일한 인터페이스를 흉내낸다.
-// (get/set/delete/list의 시그니처를 그대로 맞춰서, 아래 앱 코드는 전혀 수정할 필요 없음)
-if (!window.storage) {
-  (function () {
-    const PREFIX = "settlement_tool_storage__";
-    window.storage = {
-      async get(key, shared) {
-        try {
-          const raw = localStorage.getItem(PREFIX + key);
-          if (raw === null) return null;
-          return { key, value: raw, shared: !!shared };
-        } catch (e) { return null; }
-      },
-      async set(key, value, shared) {
-        try {
-          localStorage.setItem(PREFIX + key, value);
-          return { key, value, shared: !!shared };
-        } catch (e) { return null; }
-      },
-      async delete(key, shared) {
-        try {
-          localStorage.removeItem(PREFIX + key);
-          return { key, deleted: true, shared: !!shared };
-        } catch (e) { return null; }
-      },
-      async list(prefix, shared) {
-        try {
-          const keys = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.indexOf(PREFIX) === 0) {
-              const realKey = k.slice(PREFIX.length);
-              if (!prefix || realKey.indexOf(prefix) === 0) keys.push(realKey);
-            }
+// 저장소 계층: 1) Firebase(Firestore)로 설정돼 있으면 그걸 최우선으로,
+// 2) 없으면 Claude 아티팩트 자체 저장소(있을 경우), 3) 그것도 없으면 브라우저 localStorage.
+// 세 경우 모두 get/set/delete/list(key, shared) 시그니처가 동일해서 앱 코드는 손댈 필요 없음.
+(function () {
+  const NATIVE_STORAGE = window.storage || null; // Claude 아티팩트 안이면 이미 존재
+  const LOCAL_PREFIX = "settlement_tool_storage__";
+  const FIREBASE_CONFIG_KEY = "settlement_tool_firebase_config";
+  const FIRESTORE_COLLECTION = "settlement_storage";
+
+  function getFirebaseConfig() {
+    try {
+      const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
+      const cfg = raw ? JSON.parse(raw) : null;
+      return (cfg && cfg.mode === "firebase" && cfg.config && cfg.config.projectId) ? cfg.config : null;
+    } catch (e) { return null; }
+  }
+  window.__getFirebaseConfig = getFirebaseConfig;
+  window.__setFirebaseConfig = function (config) {
+    try {
+      if (config === null) { localStorage.removeItem(FIREBASE_CONFIG_KEY); return; }
+      localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify({ mode: "firebase", config }));
+    } catch (e) {}
+  };
+  // Firebase 콘솔에서 복사한 "const firebaseConfig = { ... };" 형태의 텍스트에서
+  // { ... } 객체 부분만 안전하게 뽑아내어 실제 JS 객체로 변환한다.
+  window.__parseFirebaseConfigText = function (text) {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start === -1 || end === -1 || end < start) throw new Error("설정값에서 중괄호 { }를 찾을 수 없습니다.");
+    const body = text.slice(start, end + 1);
+    // eslint-disable-next-line no-new-func
+    const obj = Function('"use strict"; return (' + body + ");")();
+    if (!obj || !obj.projectId) throw new Error("projectId가 없는 설정값입니다. 전체를 복사했는지 확인해주세요.");
+    return obj;
+  };
+
+  const localBackend = {
+    async get(key) {
+      try {
+        const raw = localStorage.getItem(LOCAL_PREFIX + key);
+        return raw === null ? null : { key, value: raw };
+      } catch (e) { return null; }
+    },
+    async set(key, value) {
+      try { localStorage.setItem(LOCAL_PREFIX + key, value); return { key, value }; }
+      catch (e) { return null; }
+    },
+    async delete(key) {
+      try { localStorage.removeItem(LOCAL_PREFIX + key); return { key, deleted: true }; }
+      catch (e) { return null; }
+    },
+    async list(prefix) {
+      try {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf(LOCAL_PREFIX) === 0) {
+            const realKey = k.slice(LOCAL_PREFIX.length);
+            if (!prefix || realKey.indexOf(prefix) === 0) keys.push(realKey);
           }
-          return { keys, prefix, shared: !!shared };
-        } catch (e) { return { keys: [] }; }
-      },
-    };
-  })();
-}
+        }
+        return { keys };
+      } catch (e) { return { keys: [] }; }
+    },
+  };
+
+  let firebaseAppInstance = null;
+  let firestoreDbInstance = null;
+  let firestoreConfigSignature = null;
+
+  function ensureFirestore(config) {
+    const signature = JSON.stringify(config);
+    if (firestoreDbInstance && firestoreConfigSignature === signature) return firestoreDbInstance;
+    const appName = "settlement-tool-" + Math.random().toString(36).slice(2);
+    firebaseAppInstance = firebase.initializeApp(config, appName);
+    firestoreDbInstance = firebase.firestore(firebaseAppInstance);
+    firestoreConfigSignature = signature;
+    return firestoreDbInstance;
+  }
+
+  // Firestore 문서 ID로 못 쓰는 문자(주로 "/")만 안전하게 치환
+  function docIdFor(key) { return key.replace(/\//g, "__slash__"); }
+
+  const firebaseBackend = {
+    async get(key) {
+      const cfg = getFirebaseConfig();
+      const db = ensureFirestore(cfg);
+      const snap = await db.collection(FIRESTORE_COLLECTION).doc(docIdFor(key)).get();
+      if (!snap.exists) return null;
+      return { key, value: snap.data().value };
+    },
+    async set(key, value) {
+      const cfg = getFirebaseConfig();
+      const db = ensureFirestore(cfg);
+      await db.collection(FIRESTORE_COLLECTION).doc(docIdFor(key)).set({ value, updatedAt: Date.now() });
+      return { key, value };
+    },
+    async delete(key) {
+      const cfg = getFirebaseConfig();
+      const db = ensureFirestore(cfg);
+      await db.collection(FIRESTORE_COLLECTION).doc(docIdFor(key)).delete();
+      return { key, deleted: true };
+    },
+    async list(prefix) {
+      const cfg = getFirebaseConfig();
+      const db = ensureFirestore(cfg);
+      const snap = await db.collection(FIRESTORE_COLLECTION).get();
+      const keys = [];
+      snap.forEach((doc) => {
+        const k = doc.id.replace(/__slash__/g, "/");
+        if (!prefix || k.indexOf(prefix) === 0) keys.push(k);
+      });
+      return { keys };
+    },
+  };
+
+  window.storage = {
+    async get(key, shared) {
+      if (getFirebaseConfig()) return firebaseBackend.get(key);
+      if (NATIVE_STORAGE) return NATIVE_STORAGE.get(key, shared);
+      return localBackend.get(key);
+    },
+    async set(key, value, shared) {
+      if (getFirebaseConfig()) return firebaseBackend.set(key, value);
+      if (NATIVE_STORAGE) return NATIVE_STORAGE.set(key, value, shared);
+      return localBackend.set(key, value);
+    },
+    async delete(key, shared) {
+      if (getFirebaseConfig()) return firebaseBackend.delete(key);
+      if (NATIVE_STORAGE) return NATIVE_STORAGE.delete(key, shared);
+      return localBackend.delete(key);
+    },
+    async list(prefix, shared) {
+      if (getFirebaseConfig()) return firebaseBackend.list(prefix);
+      if (NATIVE_STORAGE) return NATIVE_STORAGE.list(prefix, shared);
+      return localBackend.list(prefix);
+    },
+  };
+})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
@@ -2215,6 +2438,71 @@ if (!window.storage) {
   // ---------------------------------------------------------------------
 
   const HISTORY_PREFIX = "dashboard:";
+
+  // ---------------------------------------------------------------------
+  // 저장소 설정 UI (로컬 저장 / 구글시트 저장 전환)
+  // ---------------------------------------------------------------------
+
+  function initStorageSettingsUI() {
+    const btn = document.getElementById("storageSettingsBtn");
+    const panel = document.getElementById("storageSettingsPanel");
+    const radios = document.querySelectorAll('input[name="storageMode"]');
+    const fields = document.getElementById("firebaseConfigFields");
+    const configInput = document.getElementById("firebaseConfigInput");
+    const status = document.getElementById("firebaseStatus");
+
+    btn.addEventListener("click", () => {
+      panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
+
+    const cfg = window.__getFirebaseConfig ? window.__getFirebaseConfig() : null;
+    if (cfg) {
+      document.querySelector('input[name="storageMode"][value="firebase"]').checked = true;
+      fields.style.display = "block";
+      configInput.value = JSON.stringify(cfg, null, 2);
+      status.style.color = "var(--ok)";
+      status.textContent = "Firebase 저장소가 설정되어 있습니다. (프로젝트: " + cfg.projectId + ")";
+    }
+
+    radios.forEach((r) => {
+      r.addEventListener("change", () => {
+        fields.style.display = r.value === "firebase" && r.checked ? "block" : "none";
+        if (r.value === "local" && r.checked) {
+          window.__setFirebaseConfig(null);
+          status.textContent = "";
+        }
+      });
+    });
+
+    document.getElementById("firebaseTestBtn").addEventListener("click", async () => {
+      status.style.color = "var(--ink)";
+      status.textContent = "연결 확인 중...";
+      try {
+        const config = window.__parseFirebaseConfigText(configInput.value);
+        window.__setFirebaseConfig(config);
+        const result = await window.storage.list("", false);
+        status.style.color = "var(--ok)";
+        status.textContent = `연결 성공! (프로젝트: ${config.projectId}) 현재 저장된 항목 ${(result.keys || []).length}개`;
+      } catch (e) {
+        status.style.color = "var(--stamp)";
+        status.textContent = "연결 실패: " + e.message;
+      }
+    });
+
+    document.getElementById("firebaseSaveBtn").addEventListener("click", async () => {
+      try {
+        const config = window.__parseFirebaseConfigText(configInput.value);
+        window.__setFirebaseConfig(config);
+        status.style.color = "var(--ok)";
+        status.textContent = "저장했습니다. 이제부터 Firebase에 저장/불러오기됩니다.";
+        await refreshHistoryList();
+      } catch (e) {
+        status.style.color = "var(--stamp)";
+        status.textContent = "설정값을 읽지 못했습니다: " + e.message;
+      }
+    });
+  }
+  initStorageSettingsUI();
 
   // "26.07" -> "26.06" (1월이면 전년도 12월로) : 저장 키가 이 형식(검색팀 시트명)을 따른다고 가정
   function computePreviousPeriod(periodStr) {
