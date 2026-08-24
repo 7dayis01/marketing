@@ -336,7 +336,6 @@
     border: none; border-radius: 3px; cursor: pointer;
   }
   .login-box button:hover { opacity: 0.9; }
-  .login-remember { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0; font-size: 12px; color: #6b7a72; }
   .login-error { color: #a8412c; font-size: 12px; margin-top: 8px; min-height: 16px; }
 </style>
 
@@ -345,7 +344,6 @@
     <h2>매출 정산 자동화</h2>
     <p>관리자 비밀번호를 입력하세요</p>
     <input type="password" id="loginPasswordInput" placeholder="비밀번호" autocomplete="off">
-    <label class="login-remember"><input type="checkbox" id="loginRememberCheckbox" checked> 이 브라우저에서 기억하기</label>
     <button id="loginSubmitBtn">확인</button>
     <div class="login-error" id="loginError"></div>
   </div>
@@ -360,7 +358,6 @@ document.addEventListener("DOMContentLoaded", function () {
   //     .then(b => console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")))
   // 기본 비밀번호: 00!@
   var PASSWORD_HASH = "07a411a3c3f9b2084109d981130464ec87175db3284439439c896c02f0be2783";
-  var REMEMBER_KEY = "settlement_tool_authed";
 
   async function sha256(text) {
     var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -374,30 +371,25 @@ document.addEventListener("DOMContentLoaded", function () {
     if (root) root.style.display = "";
   }
 
-  if (localStorage.getItem(REMEMBER_KEY) === "1") {
-    unlock();
-  } else {
-    var input = document.getElementById("loginPasswordInput");
-    var btn = document.getElementById("loginSubmitBtn");
-    var err = document.getElementById("loginError");
-    var remember = document.getElementById("loginRememberCheckbox");
-    if (!input || !btn || !err || !remember) return; // 화면 요소가 없으면 조용히 건너뜀
+  // 기억하기 기능 없음: 새로고침/재접속할 때마다 항상 비밀번호를 다시 입력해야 함
+  var input = document.getElementById("loginPasswordInput");
+  var btn = document.getElementById("loginSubmitBtn");
+  var err = document.getElementById("loginError");
+  if (!input || !btn || !err) return; // 화면 요소가 없으면 조용히 건너뜀
 
-    async function trySubmit() {
-      var hash = await sha256(input.value);
-      if (hash === PASSWORD_HASH) {
-        if (remember.checked) localStorage.setItem(REMEMBER_KEY, "1");
-        unlock();
-      } else {
-        err.textContent = "비밀번호가 올바르지 않습니다.";
-        input.value = "";
-        input.focus();
-      }
+  async function trySubmit() {
+    var hash = await sha256(input.value);
+    if (hash === PASSWORD_HASH) {
+      unlock();
+    } else {
+      err.textContent = "비밀번호가 올바르지 않습니다.";
+      input.value = "";
+      input.focus();
     }
-    btn.addEventListener("click", trySubmit);
-    input.addEventListener("keydown", function (e) { if (e.key === "Enter") trySubmit(); });
-    input.focus();
   }
+  btn.addEventListener("click", trySubmit);
+  input.addEventListener("keydown", function (e) { if (e.key === "Enter") trySubmit(); });
+  input.focus();
 })();
 });
 </script>
