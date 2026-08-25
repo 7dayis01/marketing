@@ -27,7 +27,7 @@
     border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 28px;
   }
   .st-masthead h1 {
-    font-family: Georgia, "Noto Serif KR", serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
     font-size: 26px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
   }
   .st-masthead .st-sub { font-size: 12px; color: #5c6b64; letter-spacing: 0.04em; }
@@ -325,7 +325,10 @@
     background: #fff; border-radius: 6px; padding: 36px 32px; width: 90%; max-width: 320px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center;
   }
-  .login-box h2 { font-size: 18px; margin: 0 0 6px; color: #1e2a2f; }
+  .login-box h2 {
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    font-size: 18px; margin: 0 0 6px; color: #1e2a2f;
+  }
   .login-box p { font-size: 12px; color: #8a948c; margin: 0 0 20px; }
   .login-box input[type="password"] {
     width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 14px;
@@ -341,7 +344,7 @@
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-box">
-    <h2>매출 정산 자동화</h2>
+    <h2>마케팅사업부 CPC 매출 정산</h2>
     <p>관리자 비밀번호를 입력하세요</p>
     <input type="password" id="loginPasswordInput" placeholder="비밀번호" autocomplete="off">
     <button id="loginSubmitBtn">확인</button>
@@ -410,7 +413,7 @@ document.addEventListener("DOMContentLoaded", function () {
 <div class="st-root" id="stRoot" style="display:none;">
   <div class="st-shell">
     <div class="st-masthead">
-      <h1>매출 정산 자동화</h1>
+      <h1>마케팅사업부 CPC 매출 정산</h1>
       <div class="st-sub">UPLOAD → CALCULATE → REVIEW</div>
     </div>
 
@@ -2598,19 +2601,32 @@ document.addEventListener("DOMContentLoaded", function () {
   async function refreshHistoryList(selectValue) {
     const sel = document.getElementById("historySelect");
     sel.innerHTML = '<option value="">불러올 월 선택...</option>';
+
+    const keySet = new Set();
+
+    // 1) 지금 활성 저장소(기본은 Firebase 공유 저장소)에서 조회
     try {
       const result = await window.storage.list(HISTORY_PREFIX, false);
-      const keys = (result && result.keys) || [];
-      keys.sort().reverse().forEach((k) => {
-        const label = k.slice(HISTORY_PREFIX.length);
-        const opt = document.createElement("option");
-        opt.value = k; opt.textContent = label;
-        sel.appendChild(opt);
-      });
-      if (selectValue) sel.value = selectValue;
+      ((result && result.keys) || []).forEach((k) => keySet.add(k));
     } catch (e) {
-      console.error("저장된 월 목록을 불러오지 못했습니다", e);
+      console.error("저장소에서 저장된 월 목록을 불러오지 못했습니다 (네트워크 문제일 수 있음):", e);
     }
+
+    // 2) 혹시 몰라 이 브라우저의 로컬 기록도 같이 확인 (Firebase 연결이 안 될 때도 안 보이지 않도록)
+    try {
+      if (window.__localBackend) {
+        const localResult = await window.__localBackend.list(HISTORY_PREFIX);
+        ((localResult && localResult.keys) || []).forEach((k) => keySet.add(k));
+      }
+    } catch (e) { /* 로컬 조회 실패는 조용히 무시 */ }
+
+    Array.from(keySet).sort().reverse().forEach((k) => {
+      const label = k.slice(HISTORY_PREFIX.length);
+      const opt = document.createElement("option");
+      opt.value = k; opt.textContent = label;
+      sel.appendChild(opt);
+    });
+    if (selectValue) sel.value = selectValue;
   }
 
   document.getElementById("saveMonthBtn").addEventListener("click", async () => {
@@ -2650,7 +2666,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const key = sel.value;
     if (!key) return;
     try {
-      const result = await window.storage.get(key, false);
+      let result = null;
+      try { result = await window.storage.get(key, false); } catch (e) { /* 아래에서 로컬로 재시도 */ }
+      if (!result && window.__localBackend) {
+        result = await window.__localBackend.get(key).catch(() => null);
+      }
       if (!result) { showGlobalError("저장된 데이터를 찾을 수 없습니다."); return; }
       const model = JSON.parse(result.value);
 
