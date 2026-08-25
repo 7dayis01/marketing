@@ -353,22 +353,33 @@
 document.addEventListener("DOMContentLoaded", function () {
 (function () {
   // 비밀번호를 코드에 그대로 적지 않고 해시(SHA-256)로만 저장해서 비교합니다.
-  // 비밀번호를 바꾸려면: 브라우저 콘솔에서 아래처럼 새 해시를 만들어서 PASSWORD_HASH 값만 바꾸면 됩니다.
+  // 비밀번호를 바꾸려면: 브라우저 콘솔에서 아래처럼 새 해시를 만들어서 값만 바꾸면 됩니다.
   //   crypto.subtle.digest("SHA-256", new TextEncoder().encode("새비밀번호"))
   //     .then(b => console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")))
-  // 기본 비밀번호: 00!@
-  var PASSWORD_HASH = "07a411a3c3f9b2084109d981130464ec87175db3284439439c896c02f0be2783";
+  // 관리자 비밀번호(데이터 입력자): 00!@  |  조회자 비밀번호(보기 전용): 0070
+  var ADMIN_PASSWORD_HASH = "07a411a3c3f9b2084109d981130464ec87175db3284439439c896c02f0be2783";
+  var VIEWER_PASSWORD_HASH = "71ffe84afd528a0365d6ec95c89a64cd6979b4a15730649feddf2dc390db9e3c";
 
   async function sha256(text) {
     var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
     return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
   }
 
-  function unlock() {
+  function applyViewerRestrictions() {
+    // 조회자는 저장소 설정 / 삭제 / 업로드 탭을 볼 수 없게 숨긴다.
+    ["storageSettingsBtn", "historyDeleteBtn", "tabBtn-upload"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+  }
+
+  function unlock(role) {
     var overlay = document.getElementById("loginOverlay");
     var root = document.getElementById("stRoot");
     if (overlay) overlay.style.display = "none";
     if (root) root.style.display = "";
+    window.__userRole = role;
+    if (role === "viewer") applyViewerRestrictions();
   }
 
   // 기억하기 기능 없음: 새로고침/재접속할 때마다 항상 비밀번호를 다시 입력해야 함
@@ -379,8 +390,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function trySubmit() {
     var hash = await sha256(input.value);
-    if (hash === PASSWORD_HASH) {
-      unlock();
+    if (hash === ADMIN_PASSWORD_HASH) {
+      unlock("admin");
+    } else if (hash === VIEWER_PASSWORD_HASH) {
+      unlock("viewer");
     } else {
       err.textContent = "비밀번호가 올바르지 않습니다.";
       input.value = "";
@@ -426,6 +439,8 @@ document.addEventListener("DOMContentLoaded", function () {
         <button class="dash-history-btn dash-history-btn-danger" id="historyDeleteBtn">삭제</button>
         <button class="dash-history-btn" id="storageSettingsBtn" title="저장소 설정">⚙ 저장소</button>
       </div>
+
+
 
       <div class="dash-storage-settings" id="storageSettingsPanel" style="display:none;">
         <div class="dash-storage-settings-title">저장소 설정 <span class="dash-manual-note">— 기본으로 팀 공유 Firebase 저장소를 사용합니다. 이 브라우저에서만 따로 쓰고 싶으면 위에서 바꾸세요.</span></div>
@@ -678,6 +693,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   };
 
+  window.__localBackend = localBackend; // 활성 저장소가 바뀌어도 예전 로컬 기록을 찾아 옮길 수 있도록 노출
   window.storage = {
     async get(key, shared) {
       if (getFirebaseConfig()) return firebaseBackend.get(key);
@@ -2798,7 +2814,42 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // 저장소가 바뀌어도(예: 로컬 -> Firebase) 예전에 이 브라우저에만 저장해뒀던
+  // 월별 기록이 사라진 것처럼 보이지 않도록, 남아있으면 찾아서 옮길 수 있게 안내한다.
+  // ---------------------------------------------------------------------
+
+  // 저장소가 바뀌어도(예: 로컬 -> Firebase) 예전에 이 브라우저에만 저장해뒀던
+  // 월별 기록이 안 보이지 않도록, 조용히 자동으로 지금 저장소에 합쳐 넣는다 (별도 확인창 없음).
+  async function autoMigrateLocalRecords() {
+    try {
+      if (!window.__localBackend) return;
+      const usingFirebase = window.__getFirebaseConfig && window.__getFirebaseConfig();
+      if (!usingFirebase) return; // 지금도 로컬을 그대로 쓰고 있으면 옮길 필요 없음
+
+      const localList = await window.__localBackend.list(HISTORY_PREFIX);
+      const localKeys = (localList && localList.keys) || [];
+      if (localKeys.length === 0) return;
+
+      let movedCount = 0;
+      for (const key of localKeys) {
+        const local = await window.__localBackend.get(key);
+        if (!local) continue;
+        const existing = await window.storage.get(key, false).catch(() => null);
+        if (existing) continue; // 이미 지금 저장소에 같은 이름이 있으면 덮어쓰지 않고 건너뜀 (안전하게)
+        await window.storage.set(key, local.value, false);
+        movedCount++;
+      }
+      if (movedCount > 0) {
+        await refreshHistoryList(); // 새로 옮겨진 항목이 "저장된 월" 목록에 바로 보이도록 갱신
+      }
+    } catch (e) {
+      console.error("로컬 기록 자동 이전 실패:", e);
+    }
+  }
+
   try { refreshHistoryList(); } catch (e) { console.error("저장된 월 목록 초기화 실패:", e); }
+  try { autoMigrateLocalRecords(); } catch (e) { console.error("로컬 기록 이전 확인 실패:", e); }
   try { tryAutoLoadFixedTemplate(); } catch (e) { console.error("고정 템플릿 자동 불러오기 실패:", e); }
 })();
 </script>
