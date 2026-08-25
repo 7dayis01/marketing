@@ -431,6 +431,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     <div class="st-tabs">
       <button class="st-tab st-tab-active" id="tabBtn-dashboard" data-tab="dashboard">대시보드</button>
+      <button class="st-tab" id="tabBtn-yearly" data-tab="yearly">연간매출정산 추이</button>
       <button class="st-tab" id="tabBtn-upload" data-tab="upload">업로드</button>
     </div>
 
@@ -485,6 +486,26 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>
 
         <a class="st-download" id="downloadLink" href="#">필요하면 엑셀 파일로도 저장</a>
+      </div>
+    </div>
+
+    <div class="st-tabpanel" id="tabpanel-yearly">
+      <div class="dash-history-bar">
+        <span class="dash-history-label">연도</span>
+        <select class="st-sheetselect" id="yearlySelect"></select>
+      </div>
+      <div id="yearlyContent">
+        <div class="dash-kpi-row" id="yearlyKpiRow"></div>
+        <div class="dash-section">
+          <div class="dash-section-title">매출액 · 정산금액 추이 <span class="dash-section-note">꺾은선 = 매출액(페이백 제외) · 막대 = 정산금액</span></div>
+          <div id="yearlyComboChart"></div>
+        </div>
+        <div class="dash-section">
+          <div class="dash-section-title">월별 상세</div>
+          <div class="dash-table-wrap">
+            <table class="dash-table" id="yearlyTable"></table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1698,10 +1719,11 @@ document.addEventListener("DOMContentLoaded", function () {
   // 저장된 전월 '요율 상이 상세' 데이터에서, 거래처별로 지난달에 값이 있었던 채널을 찾는다.
   // (전월에 채웠던 칸을 이번 달에도 표시해서 "여기 채우면 됨"을 알려주기 위함)
   async function getPrevMonthRateExceptionHints() {
-    const prevPeriod = computePreviousPeriod(state.검색팀시트);
+    const prevPeriod = computePreviousPeriod(getReliableCurrentPeriod());
     if (!prevPeriod || !window.storage) return {};
     try {
-      const res = await window.storage.get(HISTORY_PREFIX + prevPeriod, false);
+      let res = await window.storage.get(HISTORY_PREFIX + prevPeriod, false).catch(() => null);
+      if (!res && window.__localBackend) res = await window.__localBackend.get(HISTORY_PREFIX + prevPeriod).catch(() => null);
       if (!res) return {};
       const prevModel = JSON.parse(res.value);
       const sec = prevModel.sections && prevModel.sections.find((s) => s.key === "요율상이");
@@ -1871,6 +1893,25 @@ document.addEventListener("DOMContentLoaded", function () {
   function findSheetContainingMonthWord(sheetNames, monthNum) {
     if (!monthNum) return null;
     return sheetNames.find((n) => extractMonthFromName(n) === monthNum) || null;
+  }
+
+  // "당월"을 판단할 때, 검색팀 매출군 시트(state.검색팀시트)와 실제 채우고 있는
+  // 매출기입 템플릿 시트(state.기입시트)의 월이 서로 어긋나 있으면(동기화 실패 등)
+  // 매출기입 템플릿 쪽 월을 기준으로 보정한다. (실제로 값을 채우는 대상은 기입시트이므로)
+  function getReliableCurrentPeriod() {
+    const searchPeriod = state.검색팀시트;
+    const fillMonthNum = extractMonthFromName(state.기입시트);
+    if (!searchPeriod) return searchPeriod;
+    if (!fillMonthNum) return searchPeriod;
+
+    const searchMonthNum = extractMonthFromYYMM(searchPeriod);
+    if (searchMonthNum === fillMonthNum) return searchPeriod; // 서로 일치하면 그대로 사용
+
+    // 불일치: 연도 부분은 검색팀시트에서, 월은 매출기입 템플릿에서 가져와 보정
+    const yearPart = searchPeriod.split(".")[0];
+    const corrected = yearPart + "." + String(fillMonthNum).padStart(2, "0");
+    console.warn(`검색팀 시트(${searchPeriod})와 매출기입 템플릿(${state.기입시트})의 월이 달라 ${corrected} 기준으로 보정했습니다.`);
+    return corrected;
   }
 
   // 매출기입 템플릿에서 고른 월(예: '매출보고양식_6월')에 맞춰, 검색팀 매출군 시트도 같은 달로 자동 전환
@@ -2301,6 +2342,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".st-tabpanel").forEach((panel) => {
       panel.classList.toggle("st-tabpanel-active", panel.id === "tabpanel-" + name);
     });
+    if (name === "yearly") loadYearlyTrend();
   }
   document.querySelectorAll(".st-tab").forEach((btn) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
@@ -2552,13 +2594,14 @@ document.addEventListener("DOMContentLoaded", function () {
   // 매출1/매출2의 '전월 매출' 행을, 저장해둔 직전 달 데이터의 '합산 매출' 행 값으로 채운다.
   // (저장 이름을 기본값 그대로 뒀을 때의 'YY.MM' 형식 키를 기준으로 직전 달을 찾는다)
   async function applyPrevMonthSales(dashModel, wsOut) {
-    const currentPeriod = state.검색팀시트;
+    const currentPeriod = getReliableCurrentPeriod();
     const prevPeriod = computePreviousPeriod(currentPeriod);
     if (!prevPeriod || !window.storage) return { applied: false, prevPeriod };
 
     let prevModel = null;
     try {
-      const res = await window.storage.get(HISTORY_PREFIX + prevPeriod, false);
+      let res = await window.storage.get(HISTORY_PREFIX + prevPeriod, false).catch(() => null);
+      if (!res && window.__localBackend) res = await window.__localBackend.get(HISTORY_PREFIX + prevPeriod).catch(() => null);
       if (res) prevModel = JSON.parse(res.value);
     } catch (e) { /* 저장된 직전 달 데이터가 없으면 그냥 넘어감 */ }
     if (!prevModel) return { applied: false, prevPeriod };
@@ -2597,6 +2640,215 @@ document.addEventListener("DOMContentLoaded", function () {
     return { applied: appliedAny, prevPeriod };
   }
 
+
+  // ---------------------------------------------------------------------
+  // 연간매출정산 추이 (저장된 모든 월의 '페이백 제외 매출' · '정산 합계'를 모아 보여줌)
+  // ---------------------------------------------------------------------
+
+  async function collectAllSavedMonths() {
+    const keySet = new Set();
+    try {
+      const result = await window.storage.list(HISTORY_PREFIX, false);
+      ((result && result.keys) || []).forEach((k) => keySet.add(k));
+    } catch (e) { /* 무시하고 로컬로 계속 */ }
+    try {
+      if (window.__localBackend) {
+        const localResult = await window.__localBackend.list(HISTORY_PREFIX);
+        ((localResult && localResult.keys) || []).forEach((k) => keySet.add(k));
+      }
+    } catch (e) { /* 무시 */ }
+
+    const rows = [];
+    for (const key of Array.from(keySet).sort()) {
+      try {
+        let record = await window.storage.get(key, false).catch(() => null);
+        if (!record && window.__localBackend) record = await window.__localBackend.get(key).catch(() => null);
+        if (!record) continue;
+        const model = JSON.parse(record.value);
+        const kpi = model.kpi || [];
+        const findKpi = (label) => { const found = kpi.find((k) => k[0] === label); return found ? found[1] : null; };
+        rows.push({
+          month: key.slice(HISTORY_PREFIX.length),
+          sales: findKpi("페이백 제외 매출"),
+          settle: findKpi("정산 합계"),
+        });
+      } catch (e) { /* 파싱 실패한 항목은 건너뜀 */ }
+    }
+    return rows;
+  }
+
+  function fmtShortWon(n) {
+    if (n === null || n === undefined || isNaN(n)) return "–";
+    const abs = Math.abs(n);
+    if (abs >= 100000000) return (n / 100000000).toFixed(1) + "억";
+    if (abs >= 10000) return Math.round(n / 10000).toLocaleString() + "만";
+    return Math.round(n).toLocaleString();
+  }
+
+  // 매출액(꺾은선, 왼쪽 축) + 정산금액(막대, 오른쪽 축)을 한 그래프에 합쳐서 그린다.
+  // 두 값의 규모 차이가 커서(매출≫정산) 축을 따로 둬야 둘 다 잘 보인다.
+  function buildComboChartSVG(labels, lineValues, barValues) {
+    const width = 780, height = 260;
+    const padding = { top: 24, right: 60, bottom: 30, left: 60 };
+    const chartW = width - padding.left - padding.right;
+    const chartH = height - padding.top - padding.bottom;
+    const maxLineReal = Math.max(1, ...lineValues.map((v) => v || 0));
+    const maxBarReal = Math.max(1, ...barValues.map((v) => v || 0));
+    // 정산금액(막대)의 실제 최댓값이 축의 '중간'(50%) 눈금에 오도록, 막대 축 스케일은 실제 최댓값의 2배로 잡는다.
+    // (매출액 꺾은선 축은 기존처럼 최댓값이 맨 위에 오도록 유지)
+    // 매출액(꺾은선) 축은 5억을 기준으로 고정 (실제 값이 이보다 크면 잘리지 않게 자동으로 더 늘림)
+    const maxLine = Math.max(500000000, maxLineReal * 1.05);
+    const maxBar = maxBarReal * 2;
+    const slot = chartW / Math.max(1, labels.length);
+    const barW = Math.max(6, slot * 0.4);
+
+    let grid = "";
+    [0, 0.5, 1].forEach((f) => {
+      const y = padding.top + chartH - f * chartH;
+      grid += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#eef0e9" stroke-width="1"/>`;
+      grid += `<text x="${padding.left - 8}" y="${y + 4}" font-size="10" text-anchor="end" fill="#3c6e58">${fmtShortWon(maxLine * f)}</text>`;
+      grid += `<text x="${width - padding.right + 8}" y="${y + 4}" font-size="10" text-anchor="start" fill="#a8412c">${fmtShortWon(maxBar * f)}</text>`;
+    });
+
+    // 정산금액 막대 (오른쪽 축 기준)
+    let bars = "";
+    labels.forEach((label, i) => {
+      const v = barValues[i];
+      if (v === null || v === undefined) return;
+      const barH = maxBar > 0 ? (v / maxBar) * chartH : 0;
+      const x = padding.left + i * slot + (slot - barW) / 2;
+      const y = padding.top + (chartH - barH);
+      bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="#a8412c" fill-opacity="0.75" rx="2"/>`;
+    });
+
+    // 매출액 꺾은선 (왼쪽 축 기준)
+    const points = [];
+    labels.forEach((label, i) => {
+      const v = lineValues[i];
+      const cx = padding.left + i * slot + slot / 2;
+      if (v === null || v === undefined) return;
+      const cy = padding.top + chartH - (maxLine > 0 ? (v / maxLine) * chartH : 0);
+      points.push([cx, cy]);
+    });
+    let line = "";
+    if (points.length > 1) {
+      line = `<polyline points="${points.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}" fill="none" stroke="#3c6e58" stroke-width="2.5"/>`;
+    }
+    let dots = points.map((p) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.2" fill="#3c6e58"/>`).join("");
+
+    // 값 라벨(매출액은 선 위, 정산금액은 막대 위) - 두 라벨이 서로 가까우면 겹치지 않도록 간격을 벌린다.
+    const MIN_LABEL_GAP = 16;
+    let valueLabels = "";
+    labels.forEach((label, i) => {
+      const x = padding.left + i * slot + slot / 2;
+      const lv = lineValues[i];
+      const bv = barValues[i];
+
+      let lineLabelY = null, barLabelY = null;
+      if (lv !== null && lv !== undefined) {
+        const y = padding.top + chartH - (maxLine > 0 ? (lv / maxLine) * chartH : 0);
+        lineLabelY = y - 10;
+      }
+      if (bv !== null && bv !== undefined && bv > 0) {
+        const by = padding.top + (chartH - (maxBar > 0 ? (bv / maxBar) * chartH : 0));
+        barLabelY = by - 6;
+      }
+      // 두 라벨이 같은 달에 함께 있고 너무 가까우면, 매출액 라벨을 위로 더 밀어올려서 간격 확보
+      if (lineLabelY !== null && barLabelY !== null && Math.abs(lineLabelY - barLabelY) < MIN_LABEL_GAP) {
+        lineLabelY = barLabelY - MIN_LABEL_GAP;
+      }
+
+      if (lineLabelY !== null) {
+        valueLabels += `<text x="${x.toFixed(1)}" y="${lineLabelY.toFixed(1)}" font-size="9.5" text-anchor="middle" fill="#3c6e58">${fmtShortWon(lv)}</text>`;
+      }
+      if (barLabelY !== null) {
+        valueLabels += `<text x="${x.toFixed(1)}" y="${barLabelY.toFixed(1)}" font-size="9" text-anchor="middle" fill="#a8412c">${fmtShortWon(bv)}</text>`;
+      }
+    });
+
+    // x축 라벨
+    let xLabels = "";
+    labels.forEach((label, i) => {
+      const x = padding.left + i * slot + slot / 2;
+      xLabels += `<text x="${x.toFixed(1)}" y="${height - padding.bottom + 16}" font-size="10" text-anchor="middle" fill="#8a948c">${label}</text>`;
+    });
+
+    const legend = `
+      <g transform="translate(${padding.left}, 10)">
+        <line x1="0" y1="0" x2="16" y2="0" stroke="#3c6e58" stroke-width="2.5"/>
+        <text x="20" y="4" font-size="10" fill="#3c6e58">매출액(꺾은선)</text>
+        <rect x="120" y="-6" width="12" height="12" fill="#a8412c" fill-opacity="0.75" rx="2"/>
+        <text x="136" y="4" font-size="10" fill="#a8412c">정산금액(막대)</text>
+      </g>`;
+
+    return `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto; max-width:100%;">${grid}${legend}${bars}${line}${dots}${valueLabels}${xLabels}</svg>`;
+  }
+
+  function buildYearMonthKeys(year) {
+    const months = [];
+    for (let m = 1; m <= 12; m++) months.push(year + "." + String(m).padStart(2, "0"));
+    return months;
+  }
+
+  async function loadYearlyTrend(selectedYear) {
+    const rows = await collectAllSavedMonths(); // [{month:'26.07', sales, settle}, ...] 저장된 것만
+    const rowMap = {};
+    rows.forEach((r) => { rowMap[r.month] = r; });
+
+    // 저장된 데이터에서 존재하는 연도들을 모아 연도 선택지를 구성 (없으면 이번 해로 기본 설정)
+    const years = Array.from(new Set(rows.map((r) => r.month.split(".")[0]))).sort();
+    const currentYY = String(new Date().getFullYear()).slice(-2);
+    if (years.length === 0) years.push(currentYY);
+    if (!years.includes(currentYY)) years.push(currentYY);
+    years.sort();
+
+    const yearSel = document.getElementById("yearlySelect");
+    const prevSelection = selectedYear || yearSel.value || years[years.length - 1];
+    yearSel.innerHTML = "";
+    years.forEach((y) => {
+      const opt = document.createElement("option");
+      opt.value = y; opt.textContent = "20" + y + "년";
+      yearSel.appendChild(opt);
+    });
+    yearSel.value = years.includes(prevSelection) ? prevSelection : years[years.length - 1];
+    const year = yearSel.value;
+
+    // 선택한 연도의 1~12월을 항상 고정된 틀로 만들고, 저장된 값이 있으면 채워 넣는다.
+    const monthKeys = buildYearMonthKeys(year);
+    const yearRows = monthKeys.map((mk) => rowMap[mk] || { month: mk, sales: null, settle: null });
+
+    const labels = yearRows.map((r) => r.month);
+    const salesVals = yearRows.map((r) => r.sales);
+    const settleVals = yearRows.map((r) => r.settle);
+
+    const validSales = salesVals.filter((v) => v !== null && v !== undefined);
+    const validSettle = settleVals.filter((v) => v !== null && v !== undefined);
+    const totalSales = validSales.reduce((a, b) => a + b, 0);
+    const totalSettle = validSettle.reduce((a, b) => a + b, 0);
+    const lastRow = [...yearRows].reverse().find((r) => r.sales !== null || r.settle !== null);
+
+    document.getElementById("yearlyKpiRow").innerHTML = `
+      <div class="dash-kpi"><span class="dash-kpi-label">${lastRow ? lastRow.month : "-"} 매출액</span><span class="dash-kpi-value">${lastRow ? fmtShortWon(lastRow.sales) : "–"}</span></div>
+      <div class="dash-kpi"><span class="dash-kpi-label">${lastRow ? lastRow.month : "-"} 정산금액</span><span class="dash-kpi-value">${lastRow ? fmtShortWon(lastRow.settle) : "–"}</span></div>
+      <div class="dash-kpi"><span class="dash-kpi-label">${year}년 누적 매출액</span><span class="dash-kpi-value">${fmtShortWon(totalSales)}</span></div>
+      <div class="dash-kpi"><span class="dash-kpi-label">${year}년 누적 정산금액</span><span class="dash-kpi-value">${fmtShortWon(totalSettle)}</span></div>
+    `;
+
+    document.getElementById("yearlyComboChart").innerHTML = buildComboChartSVG(labels, salesVals, settleVals);
+
+    let tableHtml = "<thead><tr><th>월</th><th>매출액(페이백 제외)</th><th>정산금액</th><th>정산율</th></tr></thead><tbody>";
+    yearRows.forEach((r) => {
+      const rate = (r.sales && r.settle) ? ((r.settle / r.sales) * 100).toFixed(1) + "%" : "–";
+      tableHtml += `<tr><td class="dash-rowlabel">${r.month}</td>` +
+        `<td>${r.sales !== null && r.sales !== undefined ? Math.round(r.sales).toLocaleString("ko-KR") : "–"}</td>` +
+        `<td>${r.settle !== null && r.settle !== undefined ? Math.round(r.settle).toLocaleString("ko-KR") : "–"}</td>` +
+        `<td>${rate}</td></tr>`;
+    });
+    tableHtml += "</tbody>";
+    document.getElementById("yearlyTable").innerHTML = tableHtml;
+  }
+
+  document.getElementById("yearlySelect").addEventListener("change", (e) => loadYearlyTrend(e.target.value));
 
   async function refreshHistoryList(selectValue) {
     const sel = document.getElementById("historySelect");
