@@ -1425,7 +1425,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (name !== null && String(name).trim() === "합계") break;
       if (name !== null) {
         entries.push({
-          name: String(name),
+          name: String(name).trim(),
           rate: cellVal(ws, r, nameCol + 1),
           powercontent: cellVal(ws, r, nameCol + 2),
           google: cellVal(ws, r, nameCol + 3),
@@ -1719,23 +1719,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const RATE_EXCEPTION_FIXED_KEY = "rateExceptionFixed";
 
-  // 저장된 전월 '요율 상이 상세' 데이터에서, 거래처별로 지난달에 값이 있었던 채널을 찾는다.
-  // (전월에 채웠던 칸을 이번 달에도 표시해서 "여기 채우면 됨"을 알려주기 위함)
-  async function getPrevMonthRateExceptionHints() {
+  // 요율 상이 상세의 기본(항상 뜨는) 거래처 목록 — 광고주명·요율만 고정해둔다.
+  // 금액(파워컨텐츠/구글/메타)은 매달 새로 입력해야 하므로 여기엔 포함하지 않는다.
+  const DEFAULT_RATE_EXCEPTIONS = [
+    { name: "드림헤어라인", rate: 0.07 },
+    { name: "화접몽 강서목동점", rate: 0.15 },
+    { name: "화접몽 중앙회", rate: 0.15 },
+    { name: "사주천궁", rate: 0.07 },
+  ];
+
+  // 저장된 전월 '요율 상이 상세' 데이터에서, 거래처 목록(이름·요율)과
+  // 거래처별로 지난달에 값이 있었던 채널을 함께 읽어온다.
+  // - entries: 지난달에 있었던 거래처를 이번 달에도 자동으로 목록에 띄워주기 위한 이름/요율
+  //   (금액은 매달 새로 입력해야 하므로 가져오지 않는다)
+  // - hints: 전월에 채웠던 칸을 이번 달에도 표시해서 "여기 채우면 됨"을 알려주기 위함
+  async function getPrevMonthRateExceptionData() {
     const prevPeriod = computePreviousPeriod(getReliableCurrentPeriod());
-    if (!prevPeriod || !window.storage) return {};
+    if (!prevPeriod || !window.storage) return { entries: [], hints: {} };
     try {
       let res = await window.storage.get(HISTORY_PREFIX + prevPeriod, false).catch(() => null);
       if (!res && window.__localBackend) res = await window.__localBackend.get(HISTORY_PREFIX + prevPeriod).catch(() => null);
-      if (!res) return {};
+      if (!res) return { entries: [], hints: {} };
       const prevModel = JSON.parse(res.value);
       const sec = prevModel.sections && prevModel.sections.find((s) => s.key === "요율상이");
-      if (!sec || !sec.model) return {};
+      if (!sec || !sec.model) return { entries: [], hints: {} };
 
       const fieldForLabel = { "파워컨텐츠": "powercontent", "구글": "google", "메타": "meta" };
+      const rateColIdx = sec.model.colLabels.findIndex((l) => l.trim() === "요율");
+      const entries = [];
       const hints = {}; // { 거래처명: Set(필드명) }
       sec.model.rows.forEach((row) => {
         const name = row.label.trim();
+        if (!name) return;
+        const rateCell = rateColIdx >= 0 ? row.cells[rateColIdx] : null;
+        entries.push({ name, rate: rateCell && typeof rateCell.raw === "number" ? rateCell.raw : null });
+
         sec.model.colLabels.forEach((label, i) => {
           const field = fieldForLabel[label];
           if (!field) return;
@@ -1746,14 +1764,30 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         });
       });
-      return hints;
+      return { entries, hints };
     } catch (e) {
-      return {};
+      return { entries: [], hints: {} };
     }
   }
 
   async function refreshRateExceptionInputs() {
     const tbody = document.getElementById("rateExceptionTbody");
+
+    // 다시 그리기 전에, 화면에 이미 떠 있는(사용자가 직접 입력했을 수도 있는) 값을
+    // 거래처명 기준으로 기억해뒀다가 새로 만든 목록에 덮어씌운다.
+    // (검색팀 매출군만 먼저 올린 상태에서 금액을 입력해두고 나중에 매출기입 템플릿을
+    // 올려도, 방금 입력한 값이 이 함수가 다시 불릴 때 날아가지 않도록 하기 위함)
+    const typedByName = new Map();
+    document.querySelectorAll("#rateExceptionTbody tr").forEach((tr) => {
+      const get = (f) => { const el = tr.querySelector(`input[data-field="${f}"]`); return el ? el.value.trim() : ""; };
+      const name = get("name");
+      if (!name) return;
+      typedByName.set(name, {
+        rate: get("rate"), powercontent: get("powercontent"), google: get("google"), meta: get("meta"),
+        fixed: !!tr.querySelector('input[data-field="fixed"]').checked,
+      });
+    });
+
     tbody.innerHTML = "";
     let entries = [];
     if (state.기입템플릿 && state.기입시트) {
@@ -1763,22 +1797,94 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) { /* 표가 없거나 형식이 다르면 그냥 빈 입력으로 시작 */ }
     }
 
+    // 금액(파워컨텐츠/구글/메타)은 파일에 남아있던 값을 그대로 보여주지 않고
+    // 항상 빈 칸에서 시작한다 — 매달 새로 입력해야 하는 값이라, 자동으로 채워지면
+    // 지난 데이터가 계속 남아있는 것처럼 보이는 문제가 있었다.
+    entries.forEach((e) => { e.powercontent = null; e.google = null; e.meta = null; });
+
+    // 혹시 템플릿에 같은 거래처명이 중복으로(공백 차이 등으로 예전에 잘못 누적되어)
+    // 남아있다면 여기서 하나로 합쳐서 화면에는 거래처당 한 행만 보이게 정리한다.
+    {
+      const merged = [];
+      const byName = new Map();
+      entries.forEach((e) => {
+        const key = e.name.trim();
+        const prior = byName.get(key);
+        if (!prior) {
+          e.name = key;
+          byName.set(key, e);
+          merged.push(e);
+        } else {
+          // 값이 비어있는 쪽을 나중 행의 값으로 채워서 정보 손실 없이 한 행으로 합침
+          ["rate", "powercontent", "google", "meta"].forEach((f) => {
+            if ((prior[f] === null || prior[f] === undefined) && e[f] !== null && e[f] !== undefined) prior[f] = e[f];
+          });
+        }
+      });
+      entries = merged;
+    }
+
+    // 항상 기본으로 떠야 하는 거래처(DEFAULT_RATE_EXCEPTIONS)를 아직 목록에 없으면 추가한다.
+    DEFAULT_RATE_EXCEPTIONS.forEach((d) => {
+      if (!entries.find((e) => e.name.trim() === d.name)) {
+        entries.push({ name: d.name, rate: d.rate, powercontent: null, google: null, meta: null, fixed: true });
+      }
+    });
+
     // '고정'으로 저장해둔 거래처(광고주명·요율)를 이번 달 목록과 합침
+    // (이름 비교는 앞뒤 공백 차이로 같은 거래처가 별개로 인식되지 않도록 trim 후 비교)
     const fixedDefaults = await loadFixedRateDefaults();
     fixedDefaults.forEach((fd) => {
-      const existing = entries.find((e) => e.name === fd.name);
+      const fdName = String(fd.name || "").trim();
+      const existing = entries.find((e) => e.name.trim() === fdName);
       if (existing) {
         existing.fixed = true;
       } else {
-        entries.push({ name: fd.name, rate: fd.rate, powercontent: null, google: null, meta: null, fixed: true });
+        entries.push({ name: fdName, rate: fd.rate, powercontent: null, google: null, meta: null, fixed: true });
+      }
+    });
+
+    // 전월 '요율 상이 상세'에 있었던 거래처는(따로 "고정" 체크를 안 했어도)
+    // 이번 달 목록에 이름·요율을 자동으로 띄워준다. 금액은 매달 새로 입력해야 하므로
+    // 비워둔 채로 두고, 어느 채널에 값을 넣어야 하는지는 아래 하이라이트로 안내한다.
+    const prevMonthData = await getPrevMonthRateExceptionData();
+    prevMonthData.entries.forEach((pe) => {
+      const existing = entries.find((e) => e.name.trim() === pe.name);
+      if (!existing) {
+        entries.push({ name: pe.name, rate: pe.rate, powercontent: null, google: null, meta: null, fixed: false });
+      } else if ((existing.rate === null || existing.rate === undefined) && pe.rate !== null) {
+        existing.rate = pe.rate;
       }
     });
 
     // 전월에 값이 있던 채널을 찾아서, 해당 입력칸만 표시되도록 표시 정보를 붙인다
-    const hints = await getPrevMonthRateExceptionHints();
+    const hints = prevMonthData.hints;
     entries.forEach((e) => {
       if (hints[e.name]) e.highlightFields = hints[e.name];
     });
+
+    // 화면에 이미 입력되어 있던 값을(사용자가 직접 타이핑한 값 우선) 덮어씌운다
+    if (typedByName.size > 0) {
+      const parseTyped = (s) => {
+        if (s === "" || s === undefined) return null;
+        const n = parseFloat(String(s).replace(/,/g, ""));
+        return isNaN(n) ? null : n;
+      };
+      typedByName.forEach((typed, name) => {
+        let existing = entries.find((e) => e.name.trim() === name);
+        if (!existing) {
+          existing = { name };
+          entries.push(existing);
+        }
+        const typedRate = parseTyped(typed.rate);
+        if (typedRate !== null) existing.rate = typedRate <= 1 ? typedRate : typedRate / 100;
+        ["powercontent", "google", "meta"].forEach((f) => {
+          const v = parseTyped(typed[f]);
+          if (v !== null) existing[f] = v;
+        });
+        if (typed.fixed) existing.fixed = true;
+      });
+    }
 
     if (entries.length === 0) entries = [{}];
     entries.forEach((e) => addRateExceptionRow(e));
@@ -1976,7 +2082,11 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           state.검색팀시트 = defaultSheet;
           sel.value = defaultSheet;
-          sel.onchange = () => { state.검색팀시트 = sel.value; syncFillSheetToSearchMonth(); updateRunButton(); };
+          sel.onchange = () => { state.검색팀시트 = sel.value; syncFillSheetToSearchMonth(); updateRunButton(); refreshRateExceptionInputs(); };
+
+          // 검색팀 매출군 파일을 올린 시점에 이미 해당 월(기간)을 알 수 있으므로,
+          // 매출기입 템플릿을 아직 안 올렸어도 전월 '요율 상이 상세' 데이터를 바로 끌어와 보여준다.
+          refreshRateExceptionInputs();
         }
         if (key === "기입템플릿") {
           applyFillTemplateWorkbook(wb, file.name);
