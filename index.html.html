@@ -2634,12 +2634,26 @@ document.addEventListener("DOMContentLoaded", function () {
       const curPrevRow = curSec.model.rows.find((r) => r.label.trim() === target.curLabel);
       if (!prevTotalRow || !curPrevRow) continue;
 
-      // 열 순서가 다를 수 있으니 열 '이름'으로 매칭
+      // 열 순서가 다를 수 있으니 열 위치(실제 시트상의 열 문자, 예: "C")로 매칭한다.
+      // 예전에는 열 '이름(라벨)'으로 매칭했는데, 정산1처럼 같은 이름의 열이
+      // 두 개 이상 있는 표(예: "네이버 GFA"가 두 칸)에서는 라벨이 겹쳐서
+      // 잘못된 열의 값을 가져오는 문제가 있었다. 템플릿은 매달 같은 열 배치를
+      // 쓰므로, 실제 셀 주소(addr)에서 뽑아낸 열 문자를 기준으로 매칭하면
+      // 같은 이름의 열이 여러 개 있어도 정확히 같은 물리적 열끼리 매칭된다.
+      const colLetterOf = (addr) => {
+        const m = /^[A-Z]+/.exec(String(addr || ""));
+        return m ? m[0] : null;
+      };
+
       const prevColIndex = {};
-      prevSec.model.colLabels.forEach((label, i) => { prevColIndex[label] = i; });
+      prevSec.model.colLabels.forEach((_, i) => {
+        const letter = colLetterOf(prevTotalRow.cells[i] && prevTotalRow.cells[i].addr);
+        if (letter && !(letter in prevColIndex)) prevColIndex[letter] = i;
+      });
 
       curSec.model.colLabels.forEach((label, i) => {
-        const pIdx = prevColIndex[label];
+        const letter = colLetterOf(curPrevRow.cells[i] && curPrevRow.cells[i].addr);
+        const pIdx = letter !== null ? prevColIndex[letter] : undefined;
         if (pIdx === undefined) return;
         const prevCell = prevTotalRow.cells[pIdx];
         if (!prevCell) return;
