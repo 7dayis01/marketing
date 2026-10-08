@@ -298,6 +298,7 @@
   table.dash-manual-table td.dash-manual-hint { background: #fff6dd; }
   table.dash-manual-table td.dash-manual-hint input { border-color: #e3c565; background: #fffdf5; }
   .dash-manual-legend-hint { background: #fff6dd; border: 1px solid #e3c565; border-radius: 2px; padding: 0 4px; }
+  .dash-manual-apply-msg { margin-left: 8px; font-size: 12px; color: #5a6b57; }
 
   .dash-storage-settings {
     background: var(--panel); border: 1px solid var(--paper-line); border-radius: 3px;
@@ -574,6 +575,8 @@ document.addEventListener("DOMContentLoaded", function () {
           </table>
         </div>
         <button type="button" class="dash-history-btn" id="rateExceptionAddBtn">+ 행 추가</button>
+        <button type="button" class="dash-history-btn" id="rateExceptionApplyBtn" title="검색팀 매출군 파일에서 노란색 칸(전월에 값이 있던 채널)의 이번 달 금액을 찾아 채웁니다">검색팀 매출군에서 전월 데이터 적용</button>
+        <span id="rateExceptionApplyMsg" class="dash-manual-apply-msg"></span>
       </div>
 
       <button class="st-run" id="runBtn" disabled>정리 실행</button>
@@ -1176,6 +1179,77 @@ document.addEventListener("DOMContentLoaded", function () {
     return { result, missing };
   }
 
+  // 검색팀 매출군의 "[표] 매출"에서, 광고주별 파워컨텐츠/구글/메타 매출을 모두 읽어온다.
+  // (요율 상이 상세의 "검색팀 매출군에서 전월 데이터 적용" 버튼에서, 예외 거래처의
+  // 이번 달 금액을 자동으로 찾아오기 위함)
+  // 참고: 검색팀 매출군 파일에서는 '메타'에 해당하는 값이 'SNS'라는 열 이름으로 들어있다.
+  function extractSearchTeamAdvertiserSales(ws) {
+    const dims = sheetDims(ws);
+    const title = findRowByCellValue(ws, "[표] 매출", dims.rows, dims.cols);
+    if (!title) return [];
+    const headerRow = title.row + 1;
+    const normalize = (s) => String(s).replace(/\s+/g, " ").trim();
+    const headerToCol = {};
+    for (let c = 1; c <= dims.cols; c++) {
+      const v = cellVal(ws, headerRow, c);
+      if (v !== null) { const key = normalize(v); if (!(key in headerToCol)) headerToCol[key] = c; }
+    }
+    const nameCol = headerToCol["광고주명"];
+    if (!nameCol) return [];
+    const pcCol = headerToCol["파컨 / 플레이스 (수임료 계정만 기재)"];
+    const ggCol = headerToCol["구글 애드워즈 (수임료 계정만 기재)"];
+    const snsCol = headerToCol["SNS"];
+
+    // 헤더 아래에는 "요 율"/"VAT제외"/"VAT포함" 총계 행이 몇 줄 더 있고(광고주명 칸은 비어있음),
+    // 실제 광고주 데이터는 그다음 행부터 시작한다. "VAT포함" 행을 기준으로 데이터 시작 위치를 잡는다.
+    const vatIncl = findRowByCellValue(ws, "VAT포함", dims.rows, nameCol + 2);
+    let r = vatIncl ? vatIncl.row + 1 : headerRow + 2;
+
+    const list = [];
+    let blanks = 0;
+    while (r <= dims.rows) {
+      const name = cellVal(ws, r, nameCol);
+      if (name === null || name === "") {
+        blanks++;
+        if (blanks >= 3) break;
+        r++; continue;
+      }
+      blanks = 0;
+      const nameStr = String(name).trim();
+      list.push({
+        name: nameStr,
+        powercontent: pcCol ? cellVal(ws, r, pcCol) : null,
+        google: ggCol ? cellVal(ws, r, ggCol) : null,
+        meta: snsCol ? cellVal(ws, r, snsCol) : null,
+      });
+      r++;
+    }
+    return list;
+  }
+
+  // 요율 상이 상세에 쓰는 거래처명과 검색팀 매출군의 광고주명이 표기가 조금씩 다를 수 있어
+  // (예: "드림헤어라인" vs "드림헤어라인의원", "화접몽 강서목동점" vs "화접몽강서목동점")
+  // 공백을 무시하고 부분 포함 관계까지 확인해서 매칭한다.
+  // 표기 자체가 완전히 다른 특수 케이스(예: "화접몽 중앙회" = 검색팀 파일의 "화접몽한의원")는
+  // 아래 별칭 목록에 등록해둔다.
+  const RATE_EXCEPTION_NAME_ALIASES = {
+    "화접몽 중앙회": "화접몽한의원",
+  };
+  function rateExceptionNamesMatch(a, b) {
+    const norm = (s) => String(s || "").replace(/\s+/g, "");
+    const na = norm(a), nb = norm(b);
+    if (!na || !nb) return false;
+    if (na === nb) return true;
+    if (na.includes(nb) || nb.includes(na)) return true;
+    const aliasA = RATE_EXCEPTION_NAME_ALIASES[String(a || "").trim()];
+    if (aliasA && norm(aliasA) === nb) return true;
+    const aliasB = RATE_EXCEPTION_NAME_ALIASES[String(b || "").trim()];
+    if (aliasB && norm(aliasB) === na) return true;
+    return false;
+  }
+
+
+
   // =====================================================================
   // 매출기입 템플릿에 값 쓰기
   // =====================================================================
@@ -1672,6 +1746,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const rateStr = tr.querySelector('input[data-field="rate"]').value.trim();
       if (!name) return;
       const rate = rateStr === "" ? null : parseFloat(rateStr.replace(/,/g, ""));
+      if (fixedList.some((x) => rateNameKey(x.name) === rateNameKey(name))) return;
       fixedList.push({ name, rate: isNaN(rate) ? null : rate });
     });
     try {
@@ -1718,6 +1793,44 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   const RATE_EXCEPTION_FIXED_KEY = "rateExceptionFixed";
+
+  // 요율 상이 상세를 다시 그리는 refreshRateExceptionInputs()가 (검색팀 매출군 업로드 /
+  // 매출기입 템플릿 업로드 등 여러 경로에서) 거의 동시에 여러 번 호출될 수 있어서,
+  // 매번 늘어나는 토큰으로 "가장 마지막 호출만 실제로 화면을 그리도록" 막아준다.
+  // (그렇지 않으면 먼저 시작한 호출이 나중에 끝나면서 뒤늦게 행을 또 추가해
+  //  같은 거래처가 중복으로 보이는 문제가 생긴다)
+  let rateExceptionRefreshToken = 0;
+
+  // 거래처명 비교용 키: 유니코드 정규화(NFC) 후 모든 공백·눈에 안 보이는 문자를 제거한다.
+  // 화면에는 똑같아 보여도 한글 조합 방식(NFC/NFD)이나 보이지 않는 문자(제로폭 공백, NBSP 등)가
+  // 달라서 단순 비교(===, trim)로는 다른 이름으로 취급되던 경우를 한 거래처로 묶기 위함.
+  function rateNameKey(s) {
+    return String(s === null || s === undefined ? "" : s).normalize("NFC")
+      .replace(/[\s\u00A0\u200B-\u200D\u2060\uFEFF]/g, "");
+  }
+  // 같은 거래처(rateNameKey 기준)를 한 행으로 합친다. 먼저 나온 행을 기준으로 하고,
+  // 비어있는 값은 뒤에 나온 행의 값으로 채우며, '고정'/하이라이트 정보는 합집합으로 유지한다.
+  function dedupeRateEntries(list) {
+    const out = [];
+    const byKey = new Map();
+    list.forEach((e) => {
+      const key = rateNameKey(e && e.name);
+      if (!key) { out.push(e); return; }
+      const prior = byKey.get(key);
+      if (!prior) {
+        e.name = String(e.name).normalize("NFC").trim();
+        byKey.set(key, e);
+        out.push(e);
+        return;
+      }
+      ["rate", "powercontent", "google", "meta"].forEach((f) => {
+        if ((prior[f] === null || prior[f] === undefined) && e[f] !== null && e[f] !== undefined) prior[f] = e[f];
+      });
+      if (e.fixed) prior.fixed = true;
+      if (e.highlightFields) prior.highlightFields = new Set([...(prior.highlightFields || []), ...e.highlightFields]);
+    });
+    return out;
+  }
 
   // 요율 상이 상세의 기본(항상 뜨는) 거래처 목록 — 광고주명·요율만 고정해둔다.
   // 금액(파워컨텐츠/구글/메타)은 매달 새로 입력해야 하므로 여기엔 포함하지 않는다.
@@ -1771,6 +1884,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function refreshRateExceptionInputs() {
+    const myToken = ++rateExceptionRefreshToken;
     const tbody = document.getElementById("rateExceptionTbody");
 
     // 다시 그리기 전에, 화면에 이미 떠 있는(사용자가 직접 입력했을 수도 있는) 값을
@@ -1788,7 +1902,6 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
 
-    tbody.innerHTML = "";
     let entries = [];
     if (state.기입템플릿 && state.기입시트) {
       try {
@@ -1802,31 +1915,12 @@ document.addEventListener("DOMContentLoaded", function () {
     // 지난 데이터가 계속 남아있는 것처럼 보이는 문제가 있었다.
     entries.forEach((e) => { e.powercontent = null; e.google = null; e.meta = null; });
 
-    // 혹시 템플릿에 같은 거래처명이 중복으로(공백 차이 등으로 예전에 잘못 누적되어)
-    // 남아있다면 여기서 하나로 합쳐서 화면에는 거래처당 한 행만 보이게 정리한다.
-    {
-      const merged = [];
-      const byName = new Map();
-      entries.forEach((e) => {
-        const key = e.name.trim();
-        const prior = byName.get(key);
-        if (!prior) {
-          e.name = key;
-          byName.set(key, e);
-          merged.push(e);
-        } else {
-          // 값이 비어있는 쪽을 나중 행의 값으로 채워서 정보 손실 없이 한 행으로 합침
-          ["rate", "powercontent", "google", "meta"].forEach((f) => {
-            if ((prior[f] === null || prior[f] === undefined) && e[f] !== null && e[f] !== undefined) prior[f] = e[f];
-          });
-        }
-      });
-      entries = merged;
-    }
+    // 혹시 템플릿에 같은 거래처가 중복으로 남아있다면 여기서 한 행으로 합친다.
+    entries = dedupeRateEntries(entries);
 
     // 항상 기본으로 떠야 하는 거래처(DEFAULT_RATE_EXCEPTIONS)를 아직 목록에 없으면 추가한다.
     DEFAULT_RATE_EXCEPTIONS.forEach((d) => {
-      if (!entries.find((e) => e.name.trim() === d.name)) {
+      if (!entries.find((e) => rateNameKey(e.name) === rateNameKey(d.name))) {
         entries.push({ name: d.name, rate: d.rate, powercontent: null, google: null, meta: null, fixed: true });
       }
     });
@@ -1836,7 +1930,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const fixedDefaults = await loadFixedRateDefaults();
     fixedDefaults.forEach((fd) => {
       const fdName = String(fd.name || "").trim();
-      const existing = entries.find((e) => e.name.trim() === fdName);
+      const existing = entries.find((e) => rateNameKey(e.name) === rateNameKey(fdName));
       if (existing) {
         existing.fixed = true;
       } else {
@@ -1849,7 +1943,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 비워둔 채로 두고, 어느 채널에 값을 넣어야 하는지는 아래 하이라이트로 안내한다.
     const prevMonthData = await getPrevMonthRateExceptionData();
     prevMonthData.entries.forEach((pe) => {
-      const existing = entries.find((e) => e.name.trim() === pe.name);
+      const existing = entries.find((e) => rateNameKey(e.name) === rateNameKey(pe.name));
       if (!existing) {
         entries.push({ name: pe.name, rate: pe.rate, powercontent: null, google: null, meta: null, fixed: false });
       } else if ((existing.rate === null || existing.rate === undefined) && pe.rate !== null) {
@@ -1858,9 +1952,11 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // 전월에 값이 있던 채널을 찾아서, 해당 입력칸만 표시되도록 표시 정보를 붙인다
-    const hints = prevMonthData.hints;
+    const hintByKey = {};
+    Object.keys(prevMonthData.hints).forEach((k) => { hintByKey[rateNameKey(k)] = prevMonthData.hints[k]; });
     entries.forEach((e) => {
-      if (hints[e.name]) e.highlightFields = hints[e.name];
+      const h = hintByKey[rateNameKey(e.name)];
+      if (h) e.highlightFields = h;
     });
 
     // 화면에 이미 입력되어 있던 값을(사용자가 직접 타이핑한 값 우선) 덮어씌운다
@@ -1871,7 +1967,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return isNaN(n) ? null : n;
       };
       typedByName.forEach((typed, name) => {
-        let existing = entries.find((e) => e.name.trim() === name);
+        let existing = entries.find((e) => rateNameKey(e.name) === rateNameKey(name));
         if (!existing) {
           existing = { name };
           entries.push(existing);
@@ -1886,11 +1982,79 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
+    entries = dedupeRateEntries(entries);
     if (entries.length === 0) entries = [{}];
+
+    // 이 사이에 더 최신 호출이 시작됐다면(예: 다른 파일이 연달아 업로드된 경우),
+    // 이 오래된 호출은 화면을 건드리지 않고 조용히 물러난다 — 최신 호출의 결과만 반영되게 함.
+    if (myToken !== rateExceptionRefreshToken) return;
+
+    tbody.innerHTML = "";
     entries.forEach((e) => addRateExceptionRow(e));
   }
 
   document.getElementById("rateExceptionAddBtn").addEventListener("click", () => addRateExceptionRow());
+
+  document.getElementById("rateExceptionApplyBtn").addEventListener("click", () => {
+    const msgEl = document.getElementById("rateExceptionApplyMsg");
+    msgEl.style.color = "";
+    if (!state.검색팀매출 || !state.검색팀시트) {
+      msgEl.style.color = "var(--stamp)";
+      msgEl.textContent = "먼저 검색팀 매출군 파일을 올리고 월(시트)을 선택해주세요.";
+      return;
+    }
+
+    let salesList;
+    try {
+      const ws = state.검색팀매출.Sheets[state.검색팀시트];
+      salesList = extractSearchTeamAdvertiserSales(ws);
+    } catch (e) {
+      msgEl.style.color = "var(--stamp)";
+      msgEl.textContent = "검색팀 매출군에서 매출 표를 읽는 중 오류가 발생했습니다: " + e.message;
+      return;
+    }
+    if (!salesList.length) {
+      msgEl.style.color = "var(--stamp)";
+      msgEl.textContent = `"${state.검색팀시트}" 시트에서 [표] 매출을 찾지 못했습니다.`;
+      return;
+    }
+
+    const fieldForCol = { powercontent: "powercontent", google: "google", meta: "meta" };
+    let filledCount = 0;
+    const notFound = [];
+    document.querySelectorAll("#rateExceptionTbody tr").forEach((tr) => {
+      const nameInput = tr.querySelector('input[data-field="name"]');
+      const name = nameInput ? nameInput.value.trim() : "";
+      if (!name) return;
+      const match = salesList.find((s) => rateExceptionNamesMatch(name, s.name));
+      if (!match) { notFound.push(name); return; }
+
+      let filledAny = false;
+      Object.keys(fieldForCol).forEach((f) => {
+        const input = tr.querySelector(`input[data-field="${f}"]`);
+        const td = input ? input.closest("td") : null;
+        if (!td || !td.classList.contains("dash-manual-hint")) return; // 노란색(전월에 값 있던) 칸만 채움
+        const val = match[f];
+        if (typeof val === "number" && !isNaN(val) && val !== 0) {
+          input.value = Math.round(val);
+          td.classList.remove("dash-manual-hint");
+          td.removeAttribute("title");
+          filledCount++;
+          filledAny = true;
+        }
+      });
+      if (filledAny) saveFixedRateDefaults();
+    });
+
+    if (filledCount === 0 && notFound.length === 0) {
+      msgEl.style.color = "var(--warn)";
+      msgEl.textContent = "채울 노란색 칸이 없습니다 (전월에 값이 있던 채널이 없거나 이미 채워져 있습니다).";
+    } else {
+      msgEl.style.color = "var(--ok)";
+      msgEl.textContent = `${filledCount}개 칸을 채웠습니다.` +
+        (notFound.length ? ` (검색팀 매출군에서 못 찾은 거래처: ${notFound.join(", ")})` : "");
+    }
+  });
 
   // 엑셀에서 여러 칸을 복사해서 그대로 붙여넣기 지원 (탭=열 구분, 줄바꿈=행 구분)
   const RATE_EXCEPTION_FIELDS = ["name", "rate", "powercontent", "google", "meta"];
@@ -3051,7 +3215,10 @@ document.addEventListener("DOMContentLoaded", function () {
       await refreshHistoryList(key);
     } catch (e) {
       msg.style.color = "var(--stamp)";
-      msg.textContent = "저장 중 오류가 발생했습니다: " + e.message;
+      msg.textContent = "저장 중 오류가 발생했습니다: " + e.message +
+        (/permission/i.test(String(e.message))
+          ? " — 공유 저장소(Firebase)의 접근 규칙이 쓰기를 막고 있는 상태입니다. Firebase 콘솔 → Firestore Database → 규칙에서 확인해 주세요."
+          : "");
     }
   });
 
